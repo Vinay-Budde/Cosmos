@@ -11,7 +11,8 @@ import { useWebRTC } from '../hooks/useWebRTC';
 import { initializeKeyboard } from '../hooks/useMovement';
 import { Plus, Minus, Map } from 'lucide-react';
 
-const SOCKET_URL = 'http://localhost:5000';
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
+console.log(`[Cosmos] Connecting to backend: ${SOCKET_URL}`);
 const SPAWN_X = 35 * 32;
 const SPAWN_Y = 32 * 32;
 

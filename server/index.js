@@ -10,6 +10,12 @@ const setupSocketHandlers = require('./socket/socketHandler');
 const app = express();
 const server = http.createServer(app);
 
+// Safety check for Environment Variables
+if (!process.env.MONGO_URI) {
+  console.error("MONGO_URI is not defined in environment variables");
+  process.exit(1);
+}
+
 // Middleware
 app.use(cors({
   origin: process.env.CLIENT_URL || 'http://localhost:5173',
