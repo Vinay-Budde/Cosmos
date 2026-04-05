@@ -15,6 +15,7 @@ if (!process.env.MONGO_URI) {
   console.error("MONGO_URI is not defined in environment variables");
   process.exit(1);
 }
+console.log("Diagnostic: MONGO_URI is present:", process.env.MONGO_URI.replace(/:([^@]+)@/, ":****@")); // Mask password for safety even in diagnostic
 
 // Middleware
 app.use(cors({
