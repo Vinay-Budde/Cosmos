@@ -19,7 +19,7 @@ console.log("Diagnostic: MONGO_URI is present:", process.env.MONGO_URI.replace(/
 
 // Middleware
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:5173',
+  origin: '*', // Allow all for easier multi-device testing
   methods: ['GET', 'POST']
 }));
 app.use(express.json());
@@ -30,7 +30,7 @@ app.use('/api', apiRoutes);
 // Setup Socket.IO
 const io = new Server(server, {
   cors: {
-    origin: process.env.CLIENT_URL || 'http://localhost:5173',
+    origin: '*', // Allow all for easier multi-device testing
     methods: ['GET', 'POST']
   }
 });

@@ -3,7 +3,7 @@ import {
   Video, Headphones, ChevronDown, Users, Expand, LayoutGrid
 } from 'lucide-react';
 
-export default function TopBar({ onlineCount, hasNearby, localRoom }) {
+export default function TopBar({ onlineCount, hasNearby, localRoom, isConnected }) {
   return (
     <div
       className="flex items-center justify-between px-4 fixed top-0 w-full z-[1000] border-b border-white/5"
@@ -57,8 +57,17 @@ export default function TopBar({ onlineCount, hasNearby, localRoom }) {
         >
           <Users className="w-[15px] h-[15px]" />
           <span>{onlineCount} online</span>
-          {onlineCount > 1 && (
+          {isConnected && onlineCount > 1 && (
             <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+          )}
+          {!isConnected && (
+            <div className="flex items-center gap-1.5 ml-1 px-1.5 py-0.5 rounded-md bg-rose-500/20 text-rose-400 border border-rose-500/30">
+              <div className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+              <span className="text-[9px] uppercase tracking-widest font-black">Disconnected</span>
+            </div>
+          )}
+          {isConnected && onlineCount === 1 && (
+            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500/40 ml-1" />
           )}
         </div>
 

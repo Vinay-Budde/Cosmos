@@ -28,6 +28,7 @@ export default function CosmosView({
   const [nearbyIds,    setNearbyIds]    = useState([]);
   const [reactions,    setReactions]    = useState([]); // [{id, emoji, username, color}]
   const [handRaisedBy, setHandRaisedBy] = useState(new Set()); // socketIds with hand raised
+  const [isConnected,   setIsConnected]  = useState(false);
   const [zoom, setZoom] = useState(1.0);
 
   const { remoteStreams, createPeerConnection, removePeerConnection } = useWebRTC(socket, localStream);
@@ -38,11 +39,25 @@ export default function CosmosView({
     const s = io(SOCKET_URL, { transports: ['websocket'] });
     setSocket(s);
 
-    s.emit('join_cosmos', {
-      username: playerInfo.name,
-      color:    playerInfo.color,
-      x: SPAWN_X,
-      y: SPAWN_Y,
+    s.on('connect', () => {
+      console.log(`[Cosmos] Connected to server! ID: ${s.id}`);
+      setIsConnected(true);
+      s.emit('join_cosmos', {
+        username: playerInfo.name,
+        color:    playerInfo.color,
+        x: SPAWN_X,
+        y: SPAWN_Y,
+      });
+    });
+
+    s.on('connect_error', (err) => {
+      console.error('[Cosmos] Connection Error:', err.message);
+      setIsConnected(false);
+    });
+
+    s.on('disconnect', () => {
+      console.log('[Cosmos] Disconnected from server');
+      setIsConnected(false);
     });
 
     s.on('all_users',   (users) => setOtherUsers(users));
@@ -115,6 +130,7 @@ export default function CosmosView({
         onlineCount={otherUsers.length + 1}
         hasNearby={hasNearby}
         localRoom={localRoom}
+        isConnected={isConnected}
       />
 
       <div className="flex-1 flex overflow-hidden mt-[44px] mb-[70px]">
