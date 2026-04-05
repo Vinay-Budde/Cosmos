@@ -17,8 +17,8 @@ export default function FloatingCallUI({ myUser, participants, localStream, remo
           user={user}
           stream={user.isLocal ? localStream : remoteStreams?.[user.socketId]}
           isLocal={user.isLocal}
-          micOn={user.isLocal ? micOn : true}
-          cameraOn={user.isLocal ? cameraOn : true}
+          micOn={user.isLocal ? micOn : user.micOn}
+          cameraOn={user.isLocal ? cameraOn : user.cameraOn}
         />
       ))}
     </div>

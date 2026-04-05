@@ -47,6 +47,8 @@ export default function CosmosView({
         color:    playerInfo.color,
         x: SPAWN_X,
         y: SPAWN_Y,
+        micOn,
+        cameraOn
       });
     });
 
@@ -65,8 +67,12 @@ export default function CosmosView({
       if (prev.some(u => u.socketId === user.socketId)) return prev;
       return [...prev, user];
     }));
-    s.on('user_moved',  ({ socketId, x, y, room }) =>
-      setOtherUsers(prev => prev.map(u => u.socketId === socketId ? { ...u, x, y, room } : u))
+    s.on('media_status_update', ({ socketId, micOn, cameraOn }) => {
+      setOtherUsers(prev => prev.map(u => u.socketId === socketId ? { ...u, micOn, cameraOn } : u));
+    });
+
+    s.on('user_moved',  ({ socketId, x, y, room, micOn, cameraOn }) =>
+      setOtherUsers(prev => prev.map(u => u.socketId === socketId ? { ...u, x, y, room, micOn, cameraOn } : u))
     );
     s.on('user_left', ({ socketId }) => {
       setOtherUsers(prev => prev.filter(u => u.socketId !== socketId));
@@ -109,6 +115,13 @@ export default function CosmosView({
 
     return () => { s.disconnect(); cleanupKeyboard(); };
   }, [playerInfo]);
+
+  // Broadcast media status changes
+  useEffect(() => {
+    if (socket && isConnected) {
+      socket.emit('media_status_update', { micOn, cameraOn });
+    }
+  }, [micOn, cameraOn, isConnected, socket]);
 
   const handleZoom = (delta) =>
     setZoom(prev => parseFloat(Math.min(2.0, Math.max(0.1, prev + delta)).toFixed(2)));

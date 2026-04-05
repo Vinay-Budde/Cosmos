@@ -11,15 +11,17 @@ export default function ChatSidebar({ open, onClose, socket, myUser, messages, t
 
   const handleInputChange = (e) => {
     setInputValue(e.target.value);
-    if (socket && hasNearby) {
-      socket.emit('typing', { roomId: 'proximity', username: myUser?.username });
+    if (socket && hasNearby && nearbyUsers.length > 0) {
+      const targetIds = nearbyUsers.map(u => u.socketId);
+      socket.emit('typing', { targetIds, username: myUser?.username });
     }
   };
 
   const handleSend = (e) => {
     e.preventDefault();
-    if (!inputValue.trim() || !socket || !hasNearby) return;
-    socket.emit('send_message', { roomId: 'proximity', message: inputValue.trim() });
+    if (!inputValue.trim() || !socket || !hasNearby || nearbyUsers.length === 0) return;
+    const targetIds = nearbyUsers.map(u => u.socketId);
+    socket.emit('send_message', { targetIds, message: inputValue.trim() });
     setInputValue('');
   };
 

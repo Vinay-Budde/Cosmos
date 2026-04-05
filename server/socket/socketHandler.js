@@ -9,14 +9,14 @@ module.exports = (io) => {
 
   io.on('connection', (socket) => {
 
-    socket.on('join_cosmos', async ({ username, color, x, y }) => {
+    socket.on('join_cosmos', async ({ username, color, x, y, micOn, cameraOn }) => {
       console.log(`[JOIN] ${username} (${socket.id})`);
 
       // Remove any existing record for this exact socket (duplicate join guard)
       await User.findOneAndDelete({ socketId: socket.id });
 
       // Create fresh record
-      await User.create({ socketId: socket.id, username, color, x, y });
+      await User.create({ socketId: socket.id, username, color, x, y, micOn, cameraOn });
 
       // Only return users whose socket IDs are actively connected RIGHT NOW
       const connectedIds = Array.from(io.sockets.sockets.keys());
@@ -26,13 +26,13 @@ module.exports = (io) => {
 
       socket.emit('all_users', others);
       socket.broadcast.emit('user_joined', {
-        socketId: socket.id, username, color, x, y
+        socketId: socket.id, username, color, x, y, micOn, cameraOn
       });
     });
 
-    socket.on('position_update', async ({ x, y, room }) => {
-      await User.findOneAndUpdate({ socketId: socket.id }, { x, y, room });
-      socket.broadcast.emit('user_moved', { socketId: socket.id, x, y, room });
+    socket.on('position_update', async ({ x, y, room, micOn, cameraOn }) => {
+      await User.findOneAndUpdate({ socketId: socket.id }, { x, y, room, micOn, cameraOn });
+      socket.broadcast.emit('user_moved', { socketId: socket.id, x, y, room, micOn, cameraOn });
     });
 
     // Proximity signaling
@@ -44,23 +44,30 @@ module.exports = (io) => {
       io.to(targetSocketId).emit('proximity_disconnect', { targetSocketId: socket.id });
     });
 
-    // Chat messages
-    socket.on('send_message', async ({ roomId, message }) => {
+    // Chat messages (Directed to nearby users)
+    socket.on('send_message', async ({ targetIds, message }) => {
       const user = await User.findOne({ socketId: socket.id });
       if (!user) return;
-      const saved = await Message.create({
-        roomId, sender: user.username,
-        senderId: socket.id, message,
-        timestamp: new Date()
-      });
-      io.to(roomId).emit('receive_message', {
-        sender: user.username, senderId: socket.id,
-        color: user.color, message, timestamp: saved.timestamp
-      });
+      const timestamp = new Date();
+      const payload = {
+        sender: user.username,
+        senderId: socket.id,
+        color: user.color,
+        message,
+        timestamp
+      };
+      // Send to self
+      socket.emit('receive_message', payload);
+      // Send to all nearby targets
+      if (Array.isArray(targetIds)) {
+        targetIds.forEach(id => io.to(id).emit('receive_message', payload));
+      }
     });
 
-    socket.on('typing', ({ roomId, username }) => {
-      socket.broadcast.to(roomId).emit('user_typing', { username });
+    socket.on('typing', ({ targetIds, username }) => {
+      if (Array.isArray(targetIds)) {
+        targetIds.forEach(id => io.to(id).emit('user_typing', { username }));
+      }
     });
 
     socket.on('reaction', ({ emoji }) => {
@@ -69,6 +76,10 @@ module.exports = (io) => {
 
     socket.on('hand_raise', ({ raised }) => {
       socket.broadcast.emit('hand_raise', { socketId: socket.id, raised });
+    });
+
+    socket.on('media_status_update', ({ micOn, cameraOn }) => {
+      socket.broadcast.emit('media_status_update', { socketId: socket.id, micOn, cameraOn });
     });
 
     // WebRTC relay
