@@ -31,7 +31,7 @@ export default function CosmosView({
   const [isConnected,   setIsConnected]  = useState(false);
   const [zoom, setZoom] = useState(1.0);
 
-  const { remoteStreams, createPeerConnection, removePeerConnection } = useWebRTC(socket, localStream);
+  const { remoteStreams, iceStates, createPeerConnection, removePeerConnection } = useWebRTC(socket, localStream);
 
   // ── Socket setup ──────────────────────────────────────────────
   useEffect(() => {
@@ -210,6 +210,7 @@ export default function CosmosView({
               participants={activeParticipants}
               localStream={localStream}
               remoteStreams={remoteStreams}
+              iceStates={iceStates}
               micOn={micOn}
               cameraOn={cameraOn}
             />

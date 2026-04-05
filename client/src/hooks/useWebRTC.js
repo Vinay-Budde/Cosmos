@@ -12,6 +12,7 @@ const ICE_SERVERS = {
 
 export function useWebRTC(socket, localStream) {
   const [remoteStreams, setRemoteStreams] = useState({});
+  const [iceStates,     setIceStates]     = useState({}); // socketId → iceConnectionState
   const peers = useRef({}); // socketId → RTCPeerConnection
 
   // Use a ref so removePeerConnection can be called inside oniceconnectionstatechange
@@ -62,13 +63,22 @@ export function useWebRTC(socket, localStream) {
 
     // Remote stream
     pc.ontrack = (event) => {
-      console.log(`[WebRTC] Track received from ${targetSocketId}`);
-      setRemoteStreams(prev => ({ ...prev, [targetSocketId]: event.streams[0] }));
+      console.log(`[WebRTC] Track received from ${targetSocketId}: ${event.track.kind}`);
+      setRemoteStreams(prev => {
+        const stream = prev[targetSocketId] || new MediaStream();
+        // Add new track if not already present
+        if (!stream.getTracks().find(t => t.id === event.track.id)) {
+          stream.addTrack(event.track);
+        }
+        return { ...prev, [targetSocketId]: stream };
+      });
     };
 
     // Auto-cleanup if connection drops
     pc.oniceconnectionstatechange = () => {
       const state = pc.iceConnectionState;
+      setIceStates(prev => ({ ...prev, [targetSocketId]: state }));
+      console.log(`[WebRTC] ICE State for ${targetSocketId}: ${state}`);
       if (state === 'disconnected' || state === 'failed' || state === 'closed') {
         removeRef.current?.(targetSocketId);
       }
@@ -151,5 +161,5 @@ export function useWebRTC(socket, localStream) {
     };
   }, []);
 
-  return { remoteStreams, createPeerConnection, removePeerConnection };
+  return { remoteStreams, iceStates, createPeerConnection, removePeerConnection };
 }

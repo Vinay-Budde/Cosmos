@@ -1,7 +1,9 @@
 import React, { useEffect, useRef } from 'react';
 import { MicOff, VideoOff } from 'lucide-react';
 
-export default function FloatingCallUI({ myUser, participants, localStream, remoteStreams, micOn, cameraOn }) {
+export default function FloatingCallUI({ 
+  myUser, participants, localStream, remoteStreams, iceStates, micOn, cameraOn 
+}) {
   const allParticipants = [
     { ...myUser, isLocal: true },
     ...participants.map(p => ({ ...p, isLocal: false })),
@@ -19,13 +21,14 @@ export default function FloatingCallUI({ myUser, participants, localStream, remo
           isLocal={user.isLocal}
           micOn={user.isLocal ? micOn : user.micOn}
           cameraOn={user.isLocal ? cameraOn : user.cameraOn}
+          iceState={user.isLocal ? 'connected' : iceStates?.[user.socketId]}
         />
       ))}
     </div>
   );
 }
 
-function VideoCard({ user, stream, isLocal, micOn, cameraOn }) {
+function VideoCard({ user, stream, isLocal, micOn, cameraOn, iceState }) {
   const videoRef = useRef(null);
 
   useEffect(() => {
@@ -83,6 +86,19 @@ function VideoCard({ user, stream, isLocal, micOn, cameraOn }) {
               <VideoOff size={10} className="text-white" />
             </div>
           )}
+        </div>
+
+        {/* Connection Status Badge */}
+        <div 
+          className={`absolute top-2 right-2 px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-tighter shadow-sm backdrop-blur-md border 
+            ${iceState === 'connected' || iceState === 'completed' 
+              ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' 
+              : iceState === 'failed' || iceState === 'disconnected'
+                ? 'bg-rose-500/20 text-rose-400 border-rose-500/30'
+                : 'bg-amber-500/20 text-amber-400 border-amber-500/30 animate-pulse'
+            }`}
+        >
+          {iceState === 'connected' || iceState === 'completed' ? 'Live' : iceState === 'failed' ? 'Failed' : 'Connecting...'}
         </div>
 
         {/* Online dot bottom-right */}
