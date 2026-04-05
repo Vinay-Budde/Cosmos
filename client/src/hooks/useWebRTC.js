@@ -4,6 +4,9 @@ const ICE_SERVERS = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun2.l.google.com:19302' },
+    { urls: 'stun:stun3.l.google.com:19302' },
+    { urls: 'stun:stun4.l.google.com:19302' },
   ],
 };
 
@@ -125,8 +128,11 @@ export function useWebRTC(socket, localStream) {
 
         } else if (signal.type === 'candidate') {
           const pc = peers.current[senderSocketId];
-          if (pc && pc.remoteDescription) {
+          if (pc && pc.remoteDescription && pc.remoteDescription.type) {
             await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+          } else if (pc) {
+            // Buffer candidate if needed, but for now we just log
+            console.log('[WebRTC] Buffering/ignoring candidate (remoteDesc not set)');
           }
         }
       } catch (err) {

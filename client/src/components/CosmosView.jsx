@@ -75,7 +75,12 @@ export default function CosmosView({
     });
 
     // Proximity-based WebRTC
-    s.on('proximity_connect',    ({ targetSocketId }) => createPeerConnection(targetSocketId, false));
+    s.on('proximity_connect', ({ targetSocketId }) => {
+      // Tie-breaker: decide who initiates based on socket.id comparison
+      const isInitiator = s.id > targetSocketId;
+      console.log(`[WebRTC] Proximity match with ${targetSocketId}. I am initiator: ${isInitiator}`);
+      createPeerConnection(targetSocketId, isInitiator);
+    });
     s.on('proximity_disconnect', ({ targetSocketId }) => removePeerConnection(targetSocketId));
 
     // Chat
