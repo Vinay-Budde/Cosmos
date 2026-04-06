@@ -12,17 +12,32 @@ function App() {
   useEffect(() => {
     // Initial hardware check & request
     media.startStream(true, true);
+
+    // Load from localStorage for persistence
+    const savedName = localStorage.getItem('cosmos_username');
+    const savedColor = localStorage.getItem('cosmos_color');
+    
+    if (savedName && savedColor) {
+      setPlayerInfo({ name: savedName, color: savedColor });
+      setPhase('cosmos');
+    }
   }, []);
+
+  const handleEnter = (name, color) => {
+    // Save to localStorage
+    localStorage.setItem('cosmos_username', name);
+    localStorage.setItem('cosmos_color', color);
+    
+    setPlayerInfo({ name, color });
+    setPhase('cosmos');
+  };
 
   return (
     <>
       <ToastManager />
       {phase === 'join' && (
         <JoinScreen 
-          onEnter={(name, color) => {
-            setPlayerInfo({ name, color });
-            setPhase('cosmos');
-          }} 
+          onEnter={handleEnter} 
           {...media}
         />
       )}

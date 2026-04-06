@@ -1,8 +1,8 @@
 import React, { useEffect, useRef } from 'react';
 import { MicOff, VideoOff } from 'lucide-react';
 
-export default function FloatingCallUI({ 
-  myUser, participants, localStream, remoteStreams, iceStates, micOn, cameraOn 
+export default function FloatingCallUI({
+  myUser, participants, localStream, remoteStreams, iceStates, micOn, cameraOn
 }) {
   const allParticipants = [
     { ...myUser, isLocal: true },
@@ -12,7 +12,9 @@ export default function FloatingCallUI({
   if (allParticipants.length < 2) return null;
 
   return (
-    <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 flex gap-3 items-start">
+    // On mobile: stack vertically and align left, smaller cards
+    // On desktop: row layout centered
+    <div className="absolute top-3 left-1/2 -translate-x-1/2 z-50 flex flex-col sm:flex-row gap-2 sm:gap-3 items-center sm:items-start">
       {allParticipants.map(user => (
         <VideoCard
           key={user.socketId || 'local'}
@@ -39,20 +41,20 @@ function VideoCard({ user, stream, isLocal, micOn, cameraOn, iceState }) {
     if (video.srcObject !== stream) {
       video.srcObject = stream;
     }
-    // Ensure playback starts (some browsers need an explicit play() call)
-    video.play().catch(() => {}); // ignore NotAllowedError on muted local
+    video.play().catch(() => {});
   }, [stream, trackCount]);
 
   const initial = user.username?.charAt(0).toUpperCase() || '?';
 
   return (
     <div className="flex flex-col items-center gap-1.5">
-      {/* Video / Avatar card */}
+      {/* Video / Avatar card — smaller on mobile */}
       <div
-        className="relative overflow-hidden rounded-2xl border-2 shadow-2xl"
+        className="relative overflow-hidden rounded-xl sm:rounded-2xl border-2 shadow-2xl"
         style={{
-          width: 160,
-          height: 120,
+          // Mobile: 110×82, Desktop: 160×120
+          width: 'clamp(90px, 28vw, 160px)',
+          height: 'clamp(68px, 21vw, 120px)',
           borderColor: user.color || '#6366f1',
           boxShadow: `0 0 20px ${user.color || '#6366f1'}44`,
         }}
@@ -66,13 +68,12 @@ function VideoCard({ user, stream, isLocal, micOn, cameraOn, iceState }) {
             className="w-full h-full object-cover"
           />
         ) : (
-          /* Big pixel-art-style avatar placeholder */
           <div
             className="w-full h-full flex items-center justify-center"
             style={{ background: `linear-gradient(135deg, ${user.color}22, ${user.color}55)` }}
           >
             <div
-              className="w-16 h-16 rounded-2xl flex items-center justify-center text-white text-3xl font-black shadow-lg border-2 border-white/20"
+              className="w-10 h-10 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl flex items-center justify-center text-white text-xl sm:text-3xl font-black shadow-lg border-2 border-white/20"
               style={{ backgroundColor: user.color || '#6366f1' }}
             >
               {initial}
@@ -80,40 +81,40 @@ function VideoCard({ user, stream, isLocal, micOn, cameraOn, iceState }) {
           </div>
         )}
 
-        {/* Mic/Camera indicator icons at bottom-left */}
-        <div className="absolute bottom-2 left-2 flex gap-1">
+        {/* Mic/Camera indicator */}
+        <div className="absolute bottom-1 sm:bottom-2 left-1 sm:left-2 flex gap-1">
           {!micOn && (
-            <div className="w-5 h-5 rounded-full bg-red-500/80 flex items-center justify-center backdrop-blur-sm">
-              <MicOff size={10} className="text-white" />
+            <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-red-500/80 flex items-center justify-center backdrop-blur-sm">
+              <MicOff size={8} className="text-white" />
             </div>
           )}
           {!cameraOn && (
-            <div className="w-5 h-5 rounded-full bg-red-500/80 flex items-center justify-center backdrop-blur-sm">
-              <VideoOff size={10} className="text-white" />
+            <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-red-500/80 flex items-center justify-center backdrop-blur-sm">
+              <VideoOff size={8} className="text-white" />
             </div>
           )}
         </div>
 
         {/* Connection Status Badge */}
-        <div 
-          className={`absolute top-2 right-2 px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-tighter shadow-sm backdrop-blur-md border 
-            ${iceState === 'connected' || iceState === 'completed' 
-              ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' 
+        <div
+          className={`absolute top-1 sm:top-2 right-1 sm:right-2 px-1 sm:px-1.5 py-0.5 rounded text-[7px] sm:text-[8px] font-black uppercase tracking-tighter shadow-sm backdrop-blur-md border
+            ${iceState === 'connected' || iceState === 'completed'
+              ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
               : iceState === 'failed' || iceState === 'disconnected'
                 ? 'bg-rose-500/20 text-rose-400 border-rose-500/30'
                 : 'bg-amber-500/20 text-amber-400 border-amber-500/30 animate-pulse'
             }`}
         >
-          {iceState === 'connected' || iceState === 'completed' ? 'Live' : iceState === 'failed' ? 'Failed' : 'Connecting...'}
+          {iceState === 'connected' || iceState === 'completed' ? 'Live' : iceState === 'failed' ? 'Failed' : '...'}
         </div>
 
-        {/* Online dot bottom-right */}
-        <div className="absolute bottom-2 right-2 w-3 h-3 rounded-full bg-emerald-400 border-2 border-white shadow-sm" />
+        {/* Online dot */}
+        <div className="absolute bottom-1 sm:bottom-2 right-1 sm:right-2 w-2 h-2 sm:w-3 sm:h-3 rounded-full bg-emerald-400 border-2 border-white shadow-sm" />
       </div>
 
-      {/* Name tag below card */}
+      {/* Name tag */}
       <div
-        className="px-3 py-0.5 rounded-full text-white text-[12px] font-black shadow-md"
+        className="px-2 sm:px-3 py-0.5 rounded-full text-white text-[10px] sm:text-[12px] font-black shadow-md"
         style={{ backgroundColor: user.color || '#6366f1' }}
       >
         {user.username}

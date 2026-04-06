@@ -7,6 +7,7 @@ import BottomBar from './BottomBar';
 import ChatSidebar from './ChatSidebar';
 import FloatingCallUI from './FloatingCallUI';
 import FloatingReaction from './FloatingReaction';
+import MobileControls from './MobileControls';
 import { useWebRTC } from '../hooks/useWebRTC';
 import { initializeKeyboard } from '../hooks/useMovement';
 import { Plus, Minus, Map } from 'lucide-react';
@@ -19,17 +20,18 @@ const SPAWN_Y = 32 * 32;
 export default function CosmosView({
   playerInfo, localStream, micOn, cameraOn, toggleMic, toggleCamera
 }) {
-  const [socket,       setSocket]       = useState(null);
-  const [otherUsers,   setOtherUsers]   = useState([]);
-  const [chatOpen,     setChatOpen]     = useState(false);
-  const [messages,     setMessages]     = useState([]);
-  const [typingUsers,  setTypingUsers]  = useState([]);
-  const [localRoom,    setLocalRoom]    = useState('Spatial');
-  const [nearbyIds,    setNearbyIds]    = useState([]);
-  const [reactions,    setReactions]    = useState([]); // [{id, emoji, username, color}]
-  const [handRaisedBy, setHandRaisedBy] = useState(new Set()); // socketIds with hand raised
-  const [isConnected,   setIsConnected]  = useState(false);
-  const [zoom, setZoom] = useState(1.0);
+  const [socket,          setSocket]          = useState(null);
+  const [otherUsers,      setOtherUsers]      = useState([]);
+  const [chatOpen,        setChatOpen]        = useState(false);
+  const [messages,        setMessages]        = useState([]);
+  const [typingUsers,     setTypingUsers]     = useState([]);
+  const [localRoom,       setLocalRoom]       = useState('Spatial');
+  const [nearbyIds,       setNearbyIds]       = useState([]);
+  const [reactions,       setReactions]       = useState([]);
+  const [handRaisedBy,    setHandRaisedBy]    = useState(new Set());
+  const [isConnected,     setIsConnected]     = useState(false);
+  const [zoom,            setZoom]            = useState(1.0);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   const { remoteStreams, iceStates, createPeerConnection, removePeerConnection } = useWebRTC(socket, localStream);
 
@@ -149,6 +151,7 @@ export default function CosmosView({
         hasNearby={hasNearby}
         localRoom={localRoom}
         isConnected={isConnected}
+        onMenuToggle={() => setMobileSidebarOpen(prev => !prev)}
       />
 
       <div className="flex-1 flex overflow-hidden mt-[44px] mb-[70px]">
@@ -156,6 +159,8 @@ export default function CosmosView({
           myUser={myUserObj}
           otherUsers={otherUsers}
           handRaisedBy={handRaisedBy}
+          mobileOpen={mobileSidebarOpen}
+          onMobileClose={() => setMobileSidebarOpen(false)}
         />
 
         <div className="flex-1 relative overflow-hidden">
@@ -178,6 +183,9 @@ export default function CosmosView({
           {reactions.map(r => (
             <FloatingReaction key={r.id} emoji={r.emoji} />
           ))}
+
+          {/* Mobile D-pad touch controls */}
+          <MobileControls />
 
           {/* Zoom Controls */}
           <div className="absolute right-5 top-1/2 -translate-y-1/2 z-40">
