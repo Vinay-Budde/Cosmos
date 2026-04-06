@@ -172,6 +172,13 @@ function makeAvatar(name, color) {
   txt.position.set(0, 2);
   ctr.addChild(txt);
 
+  const hand = new PIXI.Text('✋', { fontSize: 14 });
+  hand.anchor.set(0.5, 1);
+  hand.position.set(0, -S - 12);
+  hand.visible = false;
+  ctr.addChild(hand);
+  ctr._hand = hand;
+
   ctr._targetX = null;
   ctr._targetY = null;
   return ctr;
@@ -194,7 +201,7 @@ export default function CosmosCanvas({ socket, playerInfo, otherUsers, setLocalR
   const zoomRef      = useRef(zoom);
   const clickTarget  = useRef(null);
   const otherUsersRef = useRef(otherUsers); // live ref so ticker can read without re-mounting
-  const stateRef     = useRef({ app: null, world: null, players: null, fx: null, others: {}, clickDot: null });
+  const stateRef     = useRef({ app: null, world: null, players: null, fx: null, others: {}, clickDot: null, me: null });
 
   useEffect(() => { zoomRef.current = zoom; }, [zoom]);
   useEffect(() => { otherUsersRef.current = otherUsers; }, [otherUsers]);
@@ -270,6 +277,7 @@ export default function CosmosCanvas({ socket, playerInfo, otherUsers, setLocalR
     const me = makeAvatar(playerInfo.name, playerInfo.color);
     me.position.set(meRef.current.x, meRef.current.y);
     players.addChild(me);
+    stateRef.current.me = me;
 
     // ── Ticker ───────────────────────────────────────────────────
     app.ticker.add(() => {
@@ -407,7 +415,17 @@ export default function CosmosCanvas({ socket, playerInfo, otherUsers, setLocalR
         delete others[sid];
       }
     });
-  }, [otherUsers]);
+
+    // Update hand status for all others
+    Object.entries(others).forEach(([sid, spr]) => {
+      if (spr._hand) spr._hand.visible = (handRaisedBy instanceof Set) && handRaisedBy.has(sid);
+    });
+
+    // Update hand status for "me"
+    if (stateRef.current.me && stateRef.current.me._hand) {
+      stateRef.current.me._hand.visible = (handRaisedBy instanceof Set) && handRaisedBy.has(socket?.id);
+    }
+  }, [otherUsers, handRaisedBy, socket?.id]);
 
   return <div ref={canvasRef} style={{ width: '100%', height: '100%', display: 'block' }} />;
 }
