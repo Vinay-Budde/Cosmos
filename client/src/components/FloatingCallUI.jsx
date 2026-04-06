@@ -31,11 +31,17 @@ export default function FloatingCallUI({
 function VideoCard({ user, stream, isLocal, micOn, cameraOn, iceState }) {
   const videoRef = useRef(null);
 
+  const trackCount = stream ? stream.getTracks().length : 0;
+
   useEffect(() => {
-    if (videoRef.current && stream) {
-      videoRef.current.srcObject = stream;
+    const video = videoRef.current;
+    if (!video || !stream) return;
+    if (video.srcObject !== stream) {
+      video.srcObject = stream;
     }
-  }, [stream]);
+    // Ensure playback starts (some browsers need an explicit play() call)
+    video.play().catch(() => {}); // ignore NotAllowedError on muted local
+  }, [stream, trackCount]);
 
   const initial = user.username?.charAt(0).toUpperCase() || '?';
 

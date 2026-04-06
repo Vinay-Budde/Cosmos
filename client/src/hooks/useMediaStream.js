@@ -24,8 +24,7 @@ export function useMediaStream() {
 
   const startStream = useCallback(async (video = true, audio = true) => {
     const { camera, mic } = await checkDevices();
-    
-    // Adjust request based on actual hardware
+
     const constraints = {
       video: video && camera,
       audio: audio && mic
@@ -45,63 +44,67 @@ export function useMediaStream() {
       return stream;
     } catch (err) {
       console.error("Error accessing media devices:", err);
-      // Fallback if full request fails
-      if (video && audio) return startStream(false, true); // Try audio only
+      if (video && audio) return startStream(false, true);
       return null;
     }
   }, [checkDevices]);
 
   const toggleMic = useCallback(async () => {
-    if (!streamRef.current) {
-      const stream = await startStream(cameraOn, true);
-      if (stream) setMicOn(true);
+    const stream = streamRef.current;
+    if (!stream) {
+      const s = await startStream(cameraOn, true);
+      if (s) setMicOn(true);
       return;
     }
-    const audioTrack = streamRef.current.getAudioTracks()[0];
+
+    const audioTrack = stream.getAudioTracks()[0];
     if (audioTrack) {
+      // Simply toggle enabled — keeps the same MediaStream reference intact
       audioTrack.enabled = !audioTrack.enabled;
       setMicOn(audioTrack.enabled);
     } else if (!micOn && hasMicrophone) {
       try {
         const newStream = await navigator.mediaDevices.getUserMedia({ audio: true });
         const newTrack = newStream.getAudioTracks()[0];
-        streamRef.current.addTrack(newTrack);
+        stream.addTrack(newTrack);
+        // Force React to see the updated stream (same reference, new track)
+        setLocalStream(prev => prev); // triggers useEffects that depend on stream tracks
         setMicOn(true);
       } catch (err) {
         console.error("Error adding audio track:", err);
       }
     }
-    // Refresh the stream object to trigger updates
-    setLocalStream(new MediaStream(streamRef.current.getTracks()));
   }, [micOn, cameraOn, hasMicrophone, startStream]);
 
   const toggleCamera = useCallback(async () => {
-    if (!streamRef.current) {
-      const stream = await startStream(true, micOn);
-      if (stream) setCameraOn(true);
+    const stream = streamRef.current;
+    if (!stream) {
+      const s = await startStream(true, micOn);
+      if (s) setCameraOn(true);
       return;
     }
-    const videoTrack = streamRef.current.getVideoTracks()[0];
+
+    const videoTrack = stream.getVideoTracks()[0];
     if (videoTrack) {
+      // Simply toggle enabled — keeps the same MediaStream reference intact
       videoTrack.enabled = !videoTrack.enabled;
       setCameraOn(videoTrack.enabled);
     } else if (!cameraOn && hasCamera) {
       try {
         const newStream = await navigator.mediaDevices.getUserMedia({ video: true });
         const newTrack = newStream.getVideoTracks()[0];
-        streamRef.current.addTrack(newTrack);
+        stream.addTrack(newTrack);
+        // Force React to see the updated stream (same reference, new track)
+        setLocalStream(prev => prev); // triggers useEffects that depend on stream tracks
         setCameraOn(true);
       } catch (err) {
         console.error("Error adding video track:", err);
       }
     }
-    // Refresh the stream object to trigger updates
-    setLocalStream(new MediaStream(streamRef.current.getTracks()));
   }, [cameraOn, micOn, hasCamera, startStream]);
 
   useEffect(() => {
     checkDevices();
-    // Listen for device changes (plug/unplug)
     navigator.mediaDevices.addEventListener('devicechange', checkDevices);
     return () => {
       navigator.mediaDevices.removeEventListener('devicechange', checkDevices);
