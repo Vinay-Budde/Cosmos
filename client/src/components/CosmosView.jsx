@@ -64,21 +64,11 @@ export default function CosmosView({
       setIsConnected(false);
     });
 
-    s.on('all_users',   (users) => {
-      setOtherUsers(users);
-      // Initialize handRaisedBy from initial list
-      const initialRaised = new Set(users.filter(u => u.handRaised).map(u => u.socketId));
-      setHandRaisedBy(initialRaised);
-    });
-    s.on('user_joined', (user)  => {
-      setOtherUsers(prev => {
-        if (prev.some(u => u.socketId === user.socketId)) return prev;
-        return [...prev, user];
-      });
-      if (user.handRaised) {
-        setHandRaisedBy(prev => new Set(prev).add(user.socketId));
-      }
-    });
+    s.on('all_users',   (users) => setOtherUsers(users));
+    s.on('user_joined', (user)  => setOtherUsers(prev => {
+      if (prev.some(u => u.socketId === user.socketId)) return prev;
+      return [...prev, user];
+    }));
     s.on('media_status_update', ({ socketId, micOn, cameraOn }) => {
       setOtherUsers(prev => prev.map(u => u.socketId === socketId ? { ...u, micOn, cameraOn } : u));
     });

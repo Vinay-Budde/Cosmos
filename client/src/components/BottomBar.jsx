@@ -191,12 +191,7 @@ export default function BottomBar({
 
         <button
           className="flex flex-col items-center justify-center w-12 sm:w-14 h-14 rounded-xl hover:bg-rose-500/20 cursor-pointer text-rose-500 transition-all active:scale-95 group"
-          onClick={() => {
-            localStorage.removeItem('cosmos_username');
-            localStorage.setItem('cosmos_color', '#6366f1'); // reset to default if needed or just remove both
-            localStorage.removeItem('cosmos_color');
-            window.location.reload();
-          }}
+          onClick={() => window.location.reload()}
         >
           <LogOut className="w-4 h-4 sm:w-5 sm:h-5 mb-[4px] ml-1 group-hover:rotate-12 transition-transform" />
           <span className="font-bold tracking-tight" style={{ fontSize: '10px' }}>Leave</span>

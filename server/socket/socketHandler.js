@@ -71,14 +71,11 @@ module.exports = (io) => {
     });
 
     socket.on('reaction', ({ emoji }) => {
-      // Use io.emit so everyone, including the sender, receives it and sees the floating reaction
-      io.emit('reaction', { socketId: socket.id, emoji });
+      socket.broadcast.emit('reaction', { socketId: socket.id, emoji });
     });
 
-    socket.on('hand_raise', async ({ raised }) => {
-      await User.findOneAndUpdate({ socketId: socket.id }, { handRaised: raised });
-      // Use io.emit so everyone's sidebar and map updates correctly
-      io.emit('hand_raise', { socketId: socket.id, raised });
+    socket.on('hand_raise', ({ raised }) => {
+      socket.broadcast.emit('hand_raise', { socketId: socket.id, raised });
     });
 
     socket.on('media_status_update', ({ micOn, cameraOn }) => {

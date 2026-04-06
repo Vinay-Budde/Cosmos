@@ -6,15 +6,13 @@ export function useMediaStream() {
   const [cameraOn, setCameraOn] = useState(false);
   const [hasCamera, setHasCamera] = useState(true);
   const [hasMicrophone, setHasMicrophone] = useState(true);
-  const [devices, setDevices] = useState([]);
   const streamRef = useRef(null);
 
   const checkDevices = useCallback(async () => {
     try {
-      const allDevices = await navigator.mediaDevices.enumerateDevices();
-      setDevices(allDevices);
-      const camera = allDevices.some(device => device.kind === 'videoinput');
-      const mic = allDevices.some(device => device.kind === 'audioinput');
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const camera = devices.some(device => device.kind === 'videoinput');
+      const mic = devices.some(device => device.kind === 'audioinput');
       setHasCamera(camera);
       setHasMicrophone(mic);
       return { camera, mic };
@@ -24,12 +22,12 @@ export function useMediaStream() {
     }
   }, []);
 
-  const startStream = useCallback(async (video = true, audio = true, videoId = null, audioId = null) => {
+  const startStream = useCallback(async (video = true, audio = true) => {
     const { camera, mic } = await checkDevices();
 
     const constraints = {
-      video: video && camera ? (videoId ? { deviceId: { exact: videoId } } : true) : false,
-      audio: audio && mic ? (audioId ? { deviceId: { exact: audioId } } : true) : false
+      video: video && camera,
+      audio: audio && mic
     };
 
     if (!constraints.video && !constraints.audio) {
@@ -38,29 +36,7 @@ export function useMediaStream() {
     }
 
     try {
-      // If we already have a stream, stop existing tracks of the same kind to prevent conflicts
-      if (streamRef.current) {
-        if (constraints.video) {
-          streamRef.current.getVideoTracks().forEach(t => t.stop());
-        }
-        if (constraints.audio) {
-          streamRef.current.getAudioTracks().forEach(t => t.stop());
-        }
-      }
-
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      
-      if (streamRef.current) {
-        // Merge with existing stream if only one kind was requested
-        if (constraints.video && !constraints.audio) {
-          const oldAudio = streamRef.current.getAudioTracks()[0];
-          if (oldAudio) stream.addTrack(oldAudio);
-        } else if (!constraints.video && constraints.audio) {
-          const oldVideo = streamRef.current.getVideoTracks()[0];
-          if (oldVideo) stream.addTrack(oldVideo);
-        }
-      }
-
       streamRef.current = stream;
       setLocalStream(stream);
       setMicOn(audio && mic);
@@ -68,19 +44,10 @@ export function useMediaStream() {
       return stream;
     } catch (err) {
       console.error("Error accessing media devices:", err);
-      // Fallback: try audio only if video+audio failed
       if (video && audio) return startStream(false, true);
       return null;
     }
   }, [checkDevices]);
-
-  const switchDevice = useCallback(async (kind, deviceId) => {
-    if (kind === 'videoinput') {
-      return startStream(true, micOn, deviceId, null);
-    } else {
-      return startStream(cameraOn, true, null, deviceId);
-    }
-  }, [startStream, micOn, cameraOn]);
 
   const toggleMic = useCallback(async () => {
     const stream = streamRef.current;
@@ -92,10 +59,20 @@ export function useMediaStream() {
 
     const audioTrack = stream.getAudioTracks()[0];
     if (audioTrack) {
+      // Simply toggle enabled — keeps the same MediaStream reference intact
       audioTrack.enabled = !audioTrack.enabled;
       setMicOn(audioTrack.enabled);
     } else if (!micOn && hasMicrophone) {
-      startStream(cameraOn, true);
+      try {
+        const newStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const newTrack = newStream.getAudioTracks()[0];
+        stream.addTrack(newTrack);
+        // Force React to see the updated stream (same reference, new track)
+        setLocalStream(prev => prev); // triggers useEffects that depend on stream tracks
+        setMicOn(true);
+      } catch (err) {
+        console.error("Error adding audio track:", err);
+      }
     }
   }, [micOn, cameraOn, hasMicrophone, startStream]);
 
@@ -109,10 +86,20 @@ export function useMediaStream() {
 
     const videoTrack = stream.getVideoTracks()[0];
     if (videoTrack) {
+      // Simply toggle enabled — keeps the same MediaStream reference intact
       videoTrack.enabled = !videoTrack.enabled;
       setCameraOn(videoTrack.enabled);
     } else if (!cameraOn && hasCamera) {
-      startStream(true, micOn);
+      try {
+        const newStream = await navigator.mediaDevices.getUserMedia({ video: true });
+        const newTrack = newStream.getVideoTracks()[0];
+        stream.addTrack(newTrack);
+        // Force React to see the updated stream (same reference, new track)
+        setLocalStream(prev => prev); // triggers useEffects that depend on stream tracks
+        setCameraOn(true);
+      } catch (err) {
+        console.error("Error adding video track:", err);
+      }
     }
   }, [cameraOn, micOn, hasCamera, startStream]);
 
@@ -124,8 +111,5 @@ export function useMediaStream() {
     };
   }, [checkDevices]);
 
-  return { 
-    localStream, micOn, cameraOn, hasCamera, hasMicrophone, devices,
-    toggleMic, toggleCamera, startStream, switchDevice 
-  };
+  return { localStream, micOn, cameraOn, hasCamera, hasMicrophone, toggleMic, toggleCamera, startStream };
 }

@@ -9,7 +9,6 @@ const userSchema = new mongoose.Schema({
   room: { type: String, default: 'Spatial' },
   micOn: { type: Boolean, default: false },
   cameraOn: { type: Boolean, default: false },
-  handRaised: { type: Boolean, default: false },
   connectedTo: { type: String, default: null }, // socketId of current proximity partner
   lastSeen: { type: Date, default: Date.now }
 });
