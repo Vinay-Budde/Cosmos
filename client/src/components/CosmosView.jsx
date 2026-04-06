@@ -186,14 +186,15 @@ export default function CosmosView({
             {/* Troubleshooting message */}
             {showTimeoutMessage && (
               <div className="mt-8 flex flex-col items-center gap-4 animate-in fade-in zoom-in duration-500">
-                <div className="px-4 py-2 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-200 text-xs text-center max-w-[280px]">
-                  Taking longer than usual? Check your internet connection or try refreshing.
+                <div className="px-5 py-3 bg-indigo-500/10 border border-indigo-500/20 rounded-2xl text-indigo-200 text-[13px] text-center max-w-[320px] shadow-2xl">
+                  <p className="font-extrabold mb-1 uppercase tracking-widest text-[10px]">Connection Tip</p>
+                  <p className="opacity-80">Make sure your server is running in the terminal. If port 5000 was busy, it might be on 5001!</p>
                 </div>
                 <button 
                   onClick={() => window.location.reload()}
-                  className="px-6 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold transition-all"
+                  className="px-8 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-black uppercase tracking-widest transition-all"
                 >
-                  Refresh Page
+                  Refresh Connection
                 </button>
               </div>
             )}
