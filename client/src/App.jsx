@@ -15,9 +15,9 @@ function App() {
 
     // Load from localStorage for persistence
     const savedName = localStorage.getItem('cosmos_username');
-    const savedColor = localStorage.getItem('cosmos_color');
+    const savedColor = localStorage.getItem('cosmos_color') || '#6366f1'; // Fallback color
     
-    if (savedName && savedColor) {
+    if (savedName && savedName.trim()) {
       setPlayerInfo({ name: savedName, color: savedColor });
       setPhase('cosmos');
     }

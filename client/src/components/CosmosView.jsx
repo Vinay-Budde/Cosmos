@@ -110,7 +110,6 @@ export default function CosmosView({
 
     // Reactions — show floating emoji on map
     s.on('reaction', ({ socketId, emoji }) => {
-      const user = s._otherUsersSnapshot?.find?.(u => u.socketId === socketId);
       const id = `${socketId}_${Date.now()}`;
       setReactions(prev => [...prev, { id, emoji, socketId }]);
       setTimeout(() => setReactions(prev => prev.filter(r => r.id !== id)), 3000);
@@ -156,6 +155,28 @@ export default function CosmosView({
 
   return (
     <div className="w-full h-screen bg-[#111120] overflow-hidden relative flex flex-col font-sans text-white">
+      {/* Loading Overlay */}
+      {!isConnected && (
+        <div className="fixed inset-0 z-[20000] bg-[#111120] flex flex-col items-center justify-center gap-6">
+          <div className="relative">
+            <div className="w-20 h-20 border-4 border-emerald-500/20 rounded-full border-t-emerald-500 animate-spin" />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-10 h-10 bg-emerald-500/10 rounded-full animate-ping" />
+            </div>
+          </div>
+          <div className="flex flex-col items-center gap-2">
+            <h2 className="text-xl font-black tracking-widest uppercase">Joining Cosmos</h2>
+            <p className="text-slate-400 text-sm font-medium animate-pulse">Connecting to server...</p>
+          </div>
+          <div className="absolute bottom-12 flex flex-col items-center gap-3">
+             <p className="text-white/20 text-[10px] font-bold uppercase tracking-[0.2em]">Synchronizing Real-time Engine</p>
+             <div className="flex gap-1">
+                {[1, 2, 3].map(i => <div key={i} className="w-1.5 h-1.5 rounded-full bg-emerald-500/30 animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />)}
+             </div>
+          </div>
+        </div>
+      )}
+
       <TopBar
         onlineCount={otherUsers.length + 1}
         hasNearby={hasNearby}
