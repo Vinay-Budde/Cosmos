@@ -4,7 +4,7 @@ import { showToast } from '../utils/toastEmitter';
 
 export default function JoinScreen({
   onEnter,
-  localStream, micOn, cameraOn, hasCamera, hasMicrophone, devices, 
+  localStream, micOn, cameraOn, hasCamera, hasMicrophone, devices = [], 
   toggleMic, toggleCamera, switchDevice
 }) {
   const [name, setName] = useState('');
@@ -212,7 +212,7 @@ export default function JoinScreen({
                     </button>
                   ))}
                   {devices.filter(d => d.kind === 'videoinput').length === 0 && (
-                    <p className="text-slate-400 text-sm italic italic">No cameras detected</p>
+                    <p className="text-slate-400 text-sm italic">No cameras detected</p>
                   )}
                 </div>
               </div>

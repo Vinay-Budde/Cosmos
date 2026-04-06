@@ -20,6 +20,8 @@ const SPAWN_Y = 32 * 32;
 export default function CosmosView({
   playerInfo, localStream, micOn, cameraOn, toggleMic, toggleCamera
 }) {
+  if (!playerInfo) return null; // Defensive guard against early render with null state
+
   const [socket,          setSocket]          = useState(null);
   const [otherUsers,      setOtherUsers]      = useState([]);
   const [chatOpen,        setChatOpen]        = useState(false);

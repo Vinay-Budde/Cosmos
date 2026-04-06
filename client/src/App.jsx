@@ -7,6 +7,7 @@ import { useMediaStream } from './hooks/useMediaStream';
 function App() {
   const [phase, setPhase] = useState('join');
   const [playerInfo, setPlayerInfo] = useState(null);
+  const [isInitializing, setIsInitializing] = useState(true);
   const media = useMediaStream();
 
   useEffect(() => {
@@ -21,7 +22,19 @@ function App() {
       setPlayerInfo({ name: savedName, color: savedColor });
       setPhase('cosmos');
     }
+    
+    // Smooth transition: small delay to ensure React state commits
+    setTimeout(() => setIsInitializing(false), 300);
   }, []);
+
+  if (isInitializing) {
+    return (
+      <div className="fixed inset-0 bg-[#111120] flex flex-col items-center justify-center gap-4">
+        <div className="w-12 h-12 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin" />
+        <p className="text-white/40 text-[10px] font-black uppercase tracking-[0.3em]">Initializing Cosmos</p>
+      </div>
+    );
+  }
 
   const handleEnter = (name, color) => {
     // Save to localStorage
