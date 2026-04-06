@@ -153,6 +153,19 @@ export default function CosmosView({
     setChatOpen(nearbyIds.length > 0);
   }, [nearbyIds.length]);
 
+  const [showTimeoutMessage, setShowTimeoutMessage] = useState(false);
+
+  // ── Connection Timeout Monitoring ─────────────────────────────
+  useEffect(() => {
+    let timer;
+    if (!isConnected) {
+      timer = setTimeout(() => setShowTimeoutMessage(true), 7000);
+    } else {
+      setShowTimeoutMessage(false);
+    }
+    return () => clearTimeout(timer);
+  }, [isConnected]);
+
   return (
     <div className="w-full h-screen bg-[#111120] overflow-hidden relative flex flex-col font-sans text-white">
       {/* Loading Overlay */}
@@ -167,6 +180,21 @@ export default function CosmosView({
           <div className="flex flex-col items-center gap-2">
             <h2 className="text-xl font-black tracking-widest uppercase">Joining Cosmos</h2>
             <p className="text-slate-400 text-sm font-medium animate-pulse">Connecting to server...</p>
+            
+            {/* Troubleshooting message */}
+            {showTimeoutMessage && (
+              <div className="mt-8 flex flex-col items-center gap-4 animate-in fade-in zoom-in duration-500">
+                <div className="px-4 py-2 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-200 text-xs text-center max-w-[280px]">
+                  Taking longer than usual? Check your internet connection or try refreshing.
+                </div>
+                <button 
+                  onClick={() => window.location.reload()}
+                  className="px-6 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold transition-all"
+                >
+                  Refresh Page
+                </button>
+              </div>
+            )}
           </div>
           <div className="absolute bottom-12 flex flex-col items-center gap-3">
              <p className="text-white/20 text-[10px] font-bold uppercase tracking-[0.2em]">Synchronizing Real-time Engine</p>
