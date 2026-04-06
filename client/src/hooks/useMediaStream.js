@@ -67,8 +67,7 @@ export function useMediaStream() {
         const newStream = await navigator.mediaDevices.getUserMedia({ audio: true });
         const newTrack = newStream.getAudioTracks()[0];
         stream.addTrack(newTrack);
-        // Force React to see the updated stream (same reference, new track)
-        setLocalStream(prev => prev); // triggers useEffects that depend on stream tracks
+        setLocalStream(new MediaStream(stream.getTracks()));
         setMicOn(true);
       } catch (err) {
         console.error("Error adding audio track:", err);
@@ -94,8 +93,7 @@ export function useMediaStream() {
         const newStream = await navigator.mediaDevices.getUserMedia({ video: true });
         const newTrack = newStream.getVideoTracks()[0];
         stream.addTrack(newTrack);
-        // Force React to see the updated stream (same reference, new track)
-        setLocalStream(prev => prev); // triggers useEffects that depend on stream tracks
+        setLocalStream(new MediaStream(stream.getTracks()));
         setCameraOn(true);
       } catch (err) {
         console.error("Error adding video track:", err);

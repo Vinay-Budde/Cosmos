@@ -59,21 +59,28 @@ function VideoCard({ user, stream, isLocal, micOn, cameraOn, iceState }) {
           boxShadow: `0 0 20px ${user.color || '#6366f1'}44`,
         }}
       >
-        {cameraOn && stream ? (
+        {/* Video layer (always rendered if stream exists, to keep audio active) */}
+        {stream && (
           <video
             ref={videoRef}
             autoPlay
             playsInline
             muted={isLocal}
-            className="w-full h-full object-cover"
+            className={`w-full h-full object-cover transition-opacity duration-500 ${cameraOn ? 'opacity-100' : 'opacity-0 absolute inset-0'}`}
           />
-        ) : (
+        )}
+
+        {/* Avatar layer (shown when camera is off or stream is missing) */}
+        {(!cameraOn || !stream) && (
           <div
-            className="w-full h-full flex items-center justify-center"
-            style={{ background: `linear-gradient(135deg, ${user.color}22, ${user.color}55)` }}
+            className="w-full h-full flex items-center justify-center bg-slate-900/50 backdrop-blur-md"
+            style={{ 
+              background: `linear-gradient(135deg, ${user.color}22, ${user.color}55)`,
+              zIndex: cameraOn ? -1 : 1 
+            }}
           >
             <div
-              className="w-10 h-10 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl flex items-center justify-center text-white text-xl sm:text-3xl font-black shadow-lg border-2 border-white/20"
+              className="w-10 h-10 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl flex items-center justify-center text-white text-xl sm:text-3xl font-black shadow-lg border-2 border-white/20 animate-in zoom-in-50 duration-500"
               style={{ backgroundColor: user.color || '#6366f1' }}
             >
               {initial}

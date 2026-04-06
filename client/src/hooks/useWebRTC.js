@@ -64,7 +64,7 @@ export function useWebRTC(socket, localStream) {
     if (!buf || buf.length === 0) return;
     console.log(`[WebRTC] Draining ${buf.length} buffered ICE candidates for ${socketId}`);
     for (const c of buf) {
-      try { await pc.addIceCandidate(new RTCIceCandidate(c)); } catch (e) { /* ignore */ }
+      try { await pc.addIceCandidate(new RTCIceCandidate(c)); } catch { /* ignore */ }
     }
     iceCandBuf.current[socketId] = [];
   }, []);
@@ -162,16 +162,24 @@ export function useWebRTC(socket, localStream) {
   // Called whenever localStream reference changes (e.g. camera toggled on/off)
   useEffect(() => {
     if (!localStream) return;
+    const tracks = localStream.getTracks();
+    console.log(`[WebRTC] Local stream updated: ${tracks.length} tracks`, tracks.map(t => t.kind));
+
     Object.entries(peers.current).forEach(([socketId, pc]) => {
       if (pc.connectionState === 'closed') return;
-      localStream.getTracks().forEach(track => {
-        const sender = pc.getSenders().find(s => s.track?.kind === track.kind);
+      
+      tracks.forEach(track => {
+        const senders = pc.getSenders();
+        const sender = senders.find(s => s.track?.kind === track.kind);
+        
         if (sender) {
-          // replaceTrack avoids renegotiation for same-kind track swaps
+          console.log(`[WebRTC] Replacing ${track.kind} track for ${socketId}`);
           sender.replaceTrack(track).catch(e => console.warn('[WebRTC] replaceTrack error:', e));
         } else {
-          // Adding a brand-new track kind will trigger onnegotiationneeded → renegotiate
+          console.log(`[WebRTC] Adding NEW ${track.kind} track for ${socketId}`);
           pc.addTrack(track, localStream);
+          // NEW: Adding a track often needs negotiation
+          // The onnegotiationneeded will fire automatically if we added a track
         }
       });
     });
@@ -209,8 +217,8 @@ export function useWebRTC(socket, localStream) {
             // Remote desc is ready — add directly
             try {
               await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
-            } catch (e) {
-              console.warn('[WebRTC] addIceCandidate failed:', e);
+            } catch {
+              console.warn('[WebRTC] addIceCandidate failed');
             }
           } else {
             // Remote desc NOT ready — buffer the candidate

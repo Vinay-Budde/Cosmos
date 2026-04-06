@@ -1,8 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { X, Smile, Paperclip, Bold, Italic, Strikethrough, Link, Code, Send } from 'lucide-react';
+import EmojiPicker, { Theme } from 'emoji-picker-react';
 
 export default function ChatSidebar({ open, onClose, socket, myUser, messages, typingUsers, hasNearby, nearbyUsers = [], partner }) {
   const [inputValue, setInputValue] = useState('');
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const endRef = useRef(null);
 
   useEffect(() => {
@@ -23,6 +25,11 @@ export default function ChatSidebar({ open, onClose, socket, myUser, messages, t
     const targetIds = nearbyUsers.map(u => u.socketId);
     socket.emit('send_message', { targetIds, message: inputValue.trim() });
     setInputValue('');
+  };
+  
+  const onEmojiClick = (emojiData) => {
+    setInputValue(prev => prev + emojiData.emoji);
+    // Don't close picker automatically to allow multiple emojis
   };
 
   return (
@@ -190,8 +197,31 @@ export default function ChatSidebar({ open, onClose, socket, myUser, messages, t
           </form>
 
           {/* Formatting toolbar */}
-          <div className="flex items-center gap-[5px] px-1 overflow-x-auto no-scrollbar">
-            <ToolIcon icon={<Smile />} />
+          <div className="flex items-center gap-[5px] px-1 overflow-x-auto no-scrollbar relative">
+            <div className="relative">
+              <ToolIcon 
+                icon={<Smile />} 
+                onClick={() => setShowEmojiPicker(!showEmojiPicker)} 
+                active={showEmojiPicker}
+              />
+              {showEmojiPicker && (
+                <div className="absolute bottom-full left-0 mb-2 z-[600] shadow-2xl animate-in slide-in-from-bottom-2 fade-in">
+                  <div className="fixed inset-0" onClick={() => setShowEmojiPicker(false)} />
+                  <div className="relative">
+                    <EmojiPicker 
+                      onEmojiClick={onEmojiClick}
+                      autoFocusSearch={false}
+                      theme={Theme.LIGHT}
+                      width={280}
+                      height={350}
+                      searchPlaceHolder="Search emojis..."
+                      previewConfig={{ showPreview: false }}
+                      skinTonesDisabled
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
             <ToolIcon icon={<Paperclip />} />
             <div className="w-px h-3 bg-slate-200 mx-1" />
             <ToolIcon icon={<Bold />} />
@@ -207,9 +237,19 @@ export default function ChatSidebar({ open, onClose, socket, myUser, messages, t
   );
 }
 
-function ToolIcon({ icon }) {
+function ToolIcon({ icon, onClick, active }) {
   return (
-    <button type="button" className="text-slate-400 hover:text-slate-700 hover:bg-slate-100 p-[5px] rounded-lg transition-colors shrink-0">
+    <button 
+      type="button" 
+      onClick={onClick}
+      className={`
+        p-[5px] rounded-lg transition-all shrink-0
+        ${active 
+          ? 'text-indigo-600 bg-indigo-50 border border-indigo-100' 
+          : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
+        }
+      `}
+    >
       {React.cloneElement(icon, { className: 'w-[15px] h-[15px]' })}
     </button>
   );
