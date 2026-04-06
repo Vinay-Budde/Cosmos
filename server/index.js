@@ -39,11 +39,12 @@ setupSocketHandlers(io);
 
 // Connect to MongoDB and then start server
 connectDB().then(() => {
-  const PORT = process.env.PORT || 5000;
-  server.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-  });
+  console.log("DB connection established.");
 }).catch(err => {
-  console.error("Critical Failure: Could not connect to database. Server not started.");
-  process.exit(1);
+  console.error("Warning: Could not connect to database. Real-time features will work but persistence is disabled.", err.message);
+});
+
+const PORT = process.env.PORT || 5000;
+server.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
 });
