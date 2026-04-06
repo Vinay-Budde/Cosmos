@@ -144,8 +144,7 @@ function drawTile(g, type, px, py, S) {
 function makeAvatar(name, color) {
   const ctr = new PIXI.Container();
   const g = new PIXI.Graphics();
-  const safeColor = (color && typeof color === 'string') ? color : '#6366f1';
-  const c = parseInt(safeColor.replace('#', ''), 16);
+  const c = parseInt(color.replace('#', ''), 16);
   const S = 28;
 
   g.beginFill(0x000000, 0.18).drawEllipse(S/2, S-2, S*0.34, S*0.09).endFill();

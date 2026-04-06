@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { io } from 'socket.io-client';
+import io from 'socket.io-client';
 import CosmosCanvas from './CosmosCanvas';
 import TopBar from './TopBar';
 import LeftSidebar from './LeftSidebar';
@@ -20,8 +20,6 @@ const SPAWN_Y = 32 * 32;
 export default function CosmosView({
   playerInfo, localStream, micOn, cameraOn, toggleMic, toggleCamera
 }) {
-  if (!playerInfo) return null; // Defensive guard against early render with null state
-
   const [socket,          setSocket]          = useState(null);
   const [otherUsers,      setOtherUsers]      = useState([]);
   const [chatOpen,        setChatOpen]        = useState(false);
@@ -112,6 +110,7 @@ export default function CosmosView({
 
     // Reactions — show floating emoji on map
     s.on('reaction', ({ socketId, emoji }) => {
+      const user = s._otherUsersSnapshot?.find?.(u => u.socketId === socketId);
       const id = `${socketId}_${Date.now()}`;
       setReactions(prev => [...prev, { id, emoji, socketId }]);
       setTimeout(() => setReactions(prev => prev.filter(r => r.id !== id)), 3000);
@@ -155,59 +154,8 @@ export default function CosmosView({
     setChatOpen(nearbyIds.length > 0);
   }, [nearbyIds.length]);
 
-  const [showTimeoutMessage, setShowTimeoutMessage] = useState(false);
-
-  // ── Connection Timeout Monitoring ─────────────────────────────
-  useEffect(() => {
-    let timer;
-    if (!isConnected) {
-      timer = setTimeout(() => setShowTimeoutMessage(true), 7000);
-    } else {
-      setShowTimeoutMessage(false);
-    }
-    return () => clearTimeout(timer);
-  }, [isConnected]);
-
   return (
     <div className="w-full h-screen bg-[#111120] overflow-hidden relative flex flex-col font-sans text-white">
-      {/* Loading Overlay */}
-      {!isConnected && (
-        <div className="fixed inset-0 z-[20000] bg-[#111120] flex flex-col items-center justify-center gap-6">
-          <div className="relative">
-            <div className="w-20 h-20 border-4 border-emerald-500/20 rounded-full border-t-emerald-500 animate-spin" />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-10 h-10 bg-emerald-500/10 rounded-full animate-ping" />
-            </div>
-          </div>
-          <div className="flex flex-col items-center gap-2">
-            <h2 className="text-xl font-black tracking-widest uppercase">Joining Cosmos</h2>
-            <p className="text-slate-400 text-sm font-medium animate-pulse">Connecting to server...</p>
-            
-            {/* Troubleshooting message */}
-            {showTimeoutMessage && (
-              <div className="mt-8 flex flex-col items-center gap-4 animate-in fade-in zoom-in duration-500">
-                <div className="px-5 py-3 bg-indigo-500/10 border border-indigo-500/20 rounded-2xl text-indigo-200 text-[13px] text-center max-w-[320px] shadow-2xl">
-                  <p className="font-extrabold mb-1 uppercase tracking-widest text-[10px]">Connection Tip</p>
-                  <p className="opacity-80">Make sure your server is running in the terminal. If port 5000 was busy, it might be on 5001!</p>
-                </div>
-                <button 
-                  onClick={() => window.location.reload()}
-                  className="px-8 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-black uppercase tracking-widest transition-all"
-                >
-                  Refresh Connection
-                </button>
-              </div>
-            )}
-          </div>
-          <div className="absolute bottom-12 flex flex-col items-center gap-3">
-             <p className="text-white/20 text-[10px] font-bold uppercase tracking-[0.2em]">Synchronizing Real-time Engine</p>
-             <div className="flex gap-1">
-                {[1, 2, 3].map(i => <div key={i} className="w-1.5 h-1.5 rounded-full bg-emerald-500/30 animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />)}
-             </div>
-          </div>
-        </div>
-      )}
-
       <TopBar
         onlineCount={otherUsers.length + 1}
         hasNearby={hasNearby}

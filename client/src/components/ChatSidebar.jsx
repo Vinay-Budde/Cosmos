@@ -1,36 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Smile, Paperclip, Bold, Italic, Strikethrough, Link, Code, Send, Search } from 'lucide-react';
-
-const EMOJI_CATEGORIES = [
-  { label: 'Smileys', emojis: ['😀', '😃', '😄', '😁', '😅', '😂', '🤣', '😊', '😇', '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚', '😋', '😛', '😝', '😜', '🤪', '🤨', '🧐', '🤓', '😎', '🤩', '🥳', '😏', '😒', '😞', '😔', '😟', '😕', '🙁', '☹️', '😮', '😯', '😲', '😳', '🥺', '😦', '😧', '😨', '😰'] },
-  { label: 'Gestures', emojis: ['👋', '🤚', '🖐', '✋', '🖖', '👌', '🤏', '✌️', '🤞', '🤟', '🤘', '🤙', '👈', '👉', '👆', '🖕', '👇', '☝️', '👍', '👎', '✊', '👊', '🤛', '🤜', '👏', '🙌', '👐', '🤲', '🤝', '🙏', '✍️', '💅', '🤳', '💪', '🦾'] },
-  { label: 'Animals', emojis: ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐽', '🐸', '🐵', '🙈', '🙉', '🙊', '🐒', '🐔', '🐧', '🐦', '🐤', '🐣', '🐥', '🦆', '🦅', '🦉', '🦇', '🐺', '🐗', '🐴', '🦄', '🐝', '🐛', '🦋', '🐌', '🐞', '🐜', '🦟', '🦗', '🕷', '🕸', '🦂', '🐢', '🐍', '🦎', '🦖', '🦕', '🐙', '🦑', '🦐', '🦞', '🦀', '🐡', '🐠', '🐟', '🐬', '🐳', '🐋', '🦈', '🐊', '🐅', '🐆', '🦓', '🦍', '🦧', '🐘', '🦛', '🦏', '🐪', '🐫', '🦒', '🦘', '🐃', '🐄', '🐎', '🐖', '🐏', '🐑', '🐐', '🦌', '🐕', '🐩', '🦮', '🐕‍🦺', '🐈', '🐓', '🦃', '🦚', '🦜', '🦢', '🦩', '🕊', '🐇', '🦝', '🦨', '🦡', '🦦', '🦥', '🐁', '🐀', '🐿', '🦔'] },
-  { label: 'Food', emojis: ['🍏', '🍎', '🍐', '🍊', '🍋', '🍌', '🍉', '🍇', '🍓', '🍈', '🍒', '🍑', '🥭', '🍍', '🥥', '🥝', '🍅', '🍆', '🥑', '🥦', '🥬', '🥒', '🌽', '🥕', '🥔', '🍠', '🥐', '🥯', '🍞', '🥖', '🥨', '🧀', '🥚', '🍳', '🧈', '🥞', '🧇', '🥓', '🥩', '🍗', '🍖', '🦴', '🌭', '🍔', '🍟', '🍕', '🥪', '🥙', '🧆', '🌮', '🌯', '🥗', '🥘', '🍝', '🍜', '🍲', '🍛', '🍣', '🍱', '🥟', '🦪', '🍤', '🍙', '🍚', '🍘', '🍥', '🥠', '🥮', '🍢', '🍡', '🍧', '🍨', '🍦', '🥧', '🧁', '🍰', '🎂', '🍮', '🍭', '🍬', '🍫', '🍿', '🍩', '🍪', '🌰', '🥜', '🥤'] },
-];
+import { X, Smile, Paperclip, Bold, Italic, Strikethrough, Link, Code, Send } from 'lucide-react';
 
 export default function ChatSidebar({ open, onClose, socket, myUser, messages, typingUsers, hasNearby, nearbyUsers = [], partner }) {
   const [inputValue, setInputValue] = useState('');
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [emojiSearch, setEmojiSearch] = useState('');
   const endRef = useRef(null);
-  const pickerRef = useRef(null);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, typingUsers]);
-
-  // Handle click outside to close emoji picker
-  useEffect(() => {
-    const handleOutsideClick = (e) => {
-      if (pickerRef.current && !pickerRef.current.contains(e.target)) {
-        setShowEmojiPicker(false);
-      }
-    };
-    if (showEmojiPicker) {
-      document.addEventListener('mousedown', handleOutsideClick);
-    }
-    return () => document.removeEventListener('mousedown', handleOutsideClick);
-  }, [showEmojiPicker]);
 
   const handleInputChange = (e) => {
     setInputValue(e.target.value);
@@ -46,21 +23,14 @@ export default function ChatSidebar({ open, onClose, socket, myUser, messages, t
     const targetIds = nearbyUsers.map(u => u.socketId);
     socket.emit('send_message', { targetIds, message: inputValue.trim() });
     setInputValue('');
-    setShowEmojiPicker(false);
   };
-
-  const addEmoji = (emoji) => {
-    setInputValue(prev => prev + emoji);
-    // Don't close so they can add multiple emojis quickly!
-  };
-
-  const filteredEmojis = EMOJI_CATEGORIES.map(cat => ({
-    ...cat,
-    emojis: cat.emojis.filter(e => emojiSearch === '' || e.includes(emojiSearch))
-  })).filter(cat => cat.emojis.length > 0);
 
   return (
     <>
+      {/* Mobile full-screen backdrop + slide-up panel */}
+      {/* On mobile (< md): fixed full-screen overlay sliding up from bottom */}
+      {/* On desktop (>= md): inline side panel with fixed width */}
+
       {/* Mobile backdrop */}
       {open && (
         <div
@@ -73,6 +43,7 @@ export default function ChatSidebar({ open, onClose, socket, myUser, messages, t
       <div
         className={`
           bg-white flex flex-col z-[500] shadow-2xl overflow-hidden
+          /* Mobile: fixed full-screen modal sliding up */
           md:relative md:h-full md:transition-all md:duration-300 md:ease-in-out md:shrink-0
           fixed left-0 right-0 bottom-0 transition-all duration-300 ease-in-out
           rounded-t-2xl md:rounded-none
@@ -104,7 +75,7 @@ export default function ChatSidebar({ open, onClose, socket, myUser, messages, t
         </div>
 
         {/* Message Area */}
-        <div className="flex-1 overflow-y-auto flex flex-col bg-white custom-scrollbar relative">
+        <div className="flex-1 overflow-y-auto flex flex-col bg-white custom-scrollbar">
           {!hasNearby ? (
             <div className="m-auto flex flex-col items-center justify-center p-8 text-center gap-4">
               <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center border border-slate-200 animate-pulse">
@@ -188,45 +159,6 @@ export default function ChatSidebar({ open, onClose, socket, myUser, messages, t
               <div ref={endRef} />
             </div>
           )}
-
-          {/* Emoji Picker Popover */}
-          {showEmojiPicker && (
-            <div 
-              ref={pickerRef}
-              className="absolute left-4 right-4 bottom-4 bg-white border border-slate-200 rounded-2xl shadow-2xl z-[600] flex flex-col overflow-hidden animate-in slide-in-from-bottom-2 duration-200"
-              style={{ height: '240px' }}
-            >
-              <div className="px-3 py-2 border-b border-slate-100 bg-slate-50 flex items-center gap-2">
-                <Search className="w-3.5 h-3.5 text-slate-400" />
-                <input 
-                  type="text" 
-                  placeholder="Search emoji" 
-                  autoFocus
-                  value={emojiSearch}
-                  onChange={(e) => setEmojiSearch(e.target.value)}
-                  className="bg-transparent border-none outline-none text-[12px] flex-1 text-slate-600"
-                />
-              </div>
-              <div className="flex-1 overflow-y-auto p-3 custom-scrollbar">
-                {filteredEmojis.map(cat => (
-                  <div key={cat.label} className="mb-4">
-                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">{cat.label}</h4>
-                    <div className="grid grid-cols-6 sm:grid-cols-7 gap-1">
-                      {cat.emojis.map(e => (
-                        <button
-                          key={e}
-                          onClick={() => addEmoji(e)}
-                          className="w-8 h-8 flex items-center justify-center text-xl hover:bg-slate-100 rounded-lg transition-colors"
-                        >
-                          {e}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Input area */}
@@ -259,11 +191,7 @@ export default function ChatSidebar({ open, onClose, socket, myUser, messages, t
 
           {/* Formatting toolbar */}
           <div className="flex items-center gap-[5px] px-1 overflow-x-auto no-scrollbar">
-            <ToolIcon 
-              icon={<Smile />} 
-              onClick={() => setShowEmojiPicker(!showEmojiPicker)} 
-              active={showEmojiPicker}
-            />
+            <ToolIcon icon={<Smile />} />
             <ToolIcon icon={<Paperclip />} />
             <div className="w-px h-3 bg-slate-200 mx-1" />
             <ToolIcon icon={<Bold />} />
@@ -279,15 +207,9 @@ export default function ChatSidebar({ open, onClose, socket, myUser, messages, t
   );
 }
 
-function ToolIcon({ icon, onClick, active }) {
+function ToolIcon({ icon }) {
   return (
-    <button 
-      type="button" 
-      onClick={onClick}
-      className={`p-[5px] rounded-lg transition-colors shrink-0
-        ${active ? 'bg-indigo-50 text-indigo-500' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'}
-      `}
-    >
+    <button type="button" className="text-slate-400 hover:text-slate-700 hover:bg-slate-100 p-[5px] rounded-lg transition-colors shrink-0">
       {React.cloneElement(icon, { className: 'w-[15px] h-[15px]' })}
     </button>
   );
