@@ -34,6 +34,7 @@ export default function CosmosView({
   const [isConnected,     setIsConnected]     = useState(false);
   const [zoom,            setZoom]            = useState(1.0);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [isDeafened,        setDeafened]          = useState(false);
 
   const { remoteStreams, iceStates, createPeerConnection, removePeerConnection } = useWebRTC(socket, localStream);
 
@@ -159,6 +160,8 @@ export default function CosmosView({
         localRoom={localRoom}
         isConnected={isConnected}
         onMenuToggle={() => setMobileSidebarOpen(prev => !prev)}
+        isDeafened={isDeafened}
+        toggleDeafen={() => setDeafened(prev => !prev)}
       />
 
       <div className="flex-1 flex overflow-hidden mt-[44px] mb-[70px]">
@@ -229,6 +232,7 @@ export default function CosmosView({
               iceStates={iceStates}
               micOn={micOn}
               cameraOn={cameraOn}
+              isDeafened={isDeafened}
             />
           )}
         </div>

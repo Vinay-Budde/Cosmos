@@ -2,8 +2,9 @@ import React from 'react';
 import {
   Video, Headphones, ChevronDown, Users, Expand, LayoutGrid, Menu
 } from 'lucide-react';
+import { showToast } from '../utils/toastEmitter';
 
-export default function TopBar({ onlineCount, hasNearby, localRoom, isConnected, onMenuToggle }) {
+export default function TopBar({ onlineCount, hasNearby, localRoom, isConnected, onMenuToggle, isDeafened, toggleDeafen }) {
   return (
     <div
       className="flex items-center justify-between px-3 sm:px-4 fixed top-0 w-full z-[1000] border-b border-white/5"
@@ -38,11 +39,19 @@ export default function TopBar({ onlineCount, hasNearby, localRoom, isConnected,
       {/* Center: Call status */}
       <div className="flex items-center gap-1.5">
         <div className="flex items-center bg-[#111120] rounded-lg p-0.5 border border-white/5 shadow-inner">
-          <button className="hidden sm:flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md text-white/40 hover:text-white hover:bg-white/5 transition-all">
+          <button 
+            onClick={() => {
+              toggleDeafen();
+              showToast(!isDeafened ? 'Audio deafened (Muted all incoming sound)' : 'Audio undeafened');
+            }}
+            className={`hidden sm:flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md transition-all
+              ${isDeafened ? 'text-rose-400 bg-rose-500/10 hover:bg-rose-500/20' : 'text-white/40 hover:text-white hover:bg-white/5'}`}
+          >
             <Headphones className="w-[17px] h-[17px]" />
           </button>
           <div className="hidden sm:block w-px h-5 bg-white/10 mx-0.5" />
           <button
+            onClick={() => showToast(hasNearby ? 'You are currently in a call.' : 'Move closer to someone to start a call!')}
             className={`flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-md transition-all font-bold text-[11px] uppercase tracking-tight
               ${hasNearby
                 ? 'bg-emerald-600 text-white shadow-md shadow-emerald-900/40 hover:bg-emerald-500'

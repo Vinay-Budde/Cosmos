@@ -231,8 +231,8 @@ export function useWebRTC(socket, localStream) {
           await drainCandidates(pc, senderSocketId);
 
         } else if (signal.type === 'candidate') {
-          if (!pc) {
-            // Buffer candidate if PC doesn't exist yet
+          if (!pc || !pc.remoteDescription) {
+            // Buffer candidate if PC doesn't exist yet or remote description isn't set
             console.log(`[WebRTC] Initializing buffer for late candidate from ${senderSocketId}`);
             if (!iceCandBuf.current[senderSocketId]) iceCandBuf.current[senderSocketId] = [];
             iceCandBuf.current[senderSocketId].push(signal.candidate);
