@@ -2,7 +2,7 @@
 
 A real-time multiplayer virtual space where users move around a 2D pixel-art world and chat with others based on proximity — just like a virtual office.
 
-🚀 Live Demo: cosmos-gules.vercel.app — open in multiple tabs to see real-time multiplayer in action!
+🚀 Live Demo: https://cosmos-gules.vercel.app — open in multiple tabs to see real-time multiplayer in action!
 
 ✨ Features
 
