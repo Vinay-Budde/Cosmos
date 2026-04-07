@@ -30,6 +30,11 @@ export function useWebRTC(socket, localStream) {
   const streamRef   = useRef(localStream);
   const removeRef   = useRef(null);
 
+  // Perfect Negotiation state
+  const makingOfferRef = useRef({}); // socketId -> boolean
+  const ignoreOfferRef = useRef({}); // socketId -> boolean
+  const isSettingRemoteAnswerPendingRef = useRef({}); // socketId -> boolean
+
   // Keep refs current so callbacks always have the latest values
   useEffect(() => { socketRef.current  = socket;      }, [socket]);
   useEffect(() => { streamRef.current  = localStream; }, [localStream]);
@@ -97,19 +102,20 @@ export function useWebRTC(socket, localStream) {
 
     // Renegotiation (fires when tracks are added/replaced after initial offer)
     pc.onnegotiationneeded = async () => {
-      // Only the initiator should send a new offer
-      if (!isInitiator) return;
-      if (pc.signalingState !== 'stable') return;
       try {
-        console.log(`[WebRTC] Renegotiating with ${targetSocketId}`);
+        console.log(`[WebRTC] Negotiation needed for ${targetSocketId}`);
+        makingOfferRef.current[targetSocketId] = true;
         const offer = await pc.createOffer();
+        if (pc.signalingState !== 'stable') return;
         await pc.setLocalDescription(offer);
         sock.emit('webrtc_signal', {
           targetSocketId,
           signal: { type: 'offer', sdp: pc.localDescription },
         });
       } catch (err) {
-        console.error('[WebRTC] Renegotiation offer failed:', err);
+        console.error('[WebRTC] Negotiation offer failed:', err);
+      } finally {
+        makingOfferRef.current[targetSocketId] = false;
       }
     };
 
@@ -191,40 +197,54 @@ export function useWebRTC(socket, localStream) {
 
     const handleSignal = async ({ senderSocketId, signal }) => {
       try {
+        const pc = peers.current[senderSocketId];
+
         if (signal.type === 'offer') {
-          const pc = await createPeerConnection(senderSocketId, false);
-          if (!pc) return;
-          await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
-          await drainCandidates(pc, senderSocketId); // flush buffered candidates
-          const answer = await pc.createAnswer();
-          await pc.setLocalDescription(answer);
+          // Detect offer collision (Perfect Negotiation)
+          // Consistent tie-breaker: lower ID is polite
+          const isPolite = socketRef.current?.id < senderSocketId;
+          const offerCollision = makingOfferRef.current[senderSocketId] || pc?.signalingState !== 'stable';
+
+          ignoreOfferRef.current[senderSocketId] = !isPolite && offerCollision;
+          if (ignoreOfferRef.current[senderSocketId]) {
+            console.log(`[WebRTC] Ignoring offer collision for ${senderSocketId} (I am impolite)`);
+            return;
+          }
+
+          // Create PC if needed (answerer side)
+          const activePC = await createPeerConnection(senderSocketId, false);
+          if (!activePC) return;
+
+          await activePC.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+          await drainCandidates(activePC, senderSocketId);
+
+          const answer = await activePC.createAnswer();
+          await activePC.setLocalDescription(answer);
           socket.emit('webrtc_signal', {
             targetSocketId: senderSocketId,
-            signal: { type: 'answer', sdp: pc.localDescription },
+            signal: { type: 'answer', sdp: activePC.localDescription },
           });
 
         } else if (signal.type === 'answer') {
-          const pc = peers.current[senderSocketId];
-          if (pc && pc.signalingState !== 'stable') {
-            await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
-            await drainCandidates(pc, senderSocketId); // flush buffered candidates
-          }
+          if (!pc) return;
+          await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+          await drainCandidates(pc, senderSocketId);
 
         } else if (signal.type === 'candidate') {
-          const pc = peers.current[senderSocketId];
-          if (!pc) return;
-          if (pc.remoteDescription && pc.remoteDescription.type) {
-            // Remote desc is ready — add directly
-            try {
-              await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
-            } catch {
-              console.warn('[WebRTC] addIceCandidate failed');
-            }
-          } else {
-            // Remote desc NOT ready — buffer the candidate
-            console.log(`[WebRTC] Buffering ICE candidate for ${senderSocketId}`);
+          if (!pc) {
+            // Buffer candidate if PC doesn't exist yet
+            console.log(`[WebRTC] Initializing buffer for late candidate from ${senderSocketId}`);
             if (!iceCandBuf.current[senderSocketId]) iceCandBuf.current[senderSocketId] = [];
             iceCandBuf.current[senderSocketId].push(signal.candidate);
+            return;
+          }
+
+          try {
+            await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+          } catch (err) {
+            if (!ignoreOfferRef.current[senderSocketId]) {
+              console.warn('[WebRTC] addIceCandidate failed', err);
+            }
           }
         }
       } catch (err) {

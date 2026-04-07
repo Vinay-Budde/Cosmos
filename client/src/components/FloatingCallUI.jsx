@@ -33,16 +33,28 @@ export default function FloatingCallUI({
 function VideoCard({ user, stream, isLocal, micOn, cameraOn, iceState }) {
   const videoRef = useRef(null);
 
-  const trackCount = stream ? stream.getTracks().length : 0;
+  const tracks = stream ? stream.getTracks() : [];
+  const trackCount = tracks.length;
 
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !stream) return;
+
+    if (trackCount > 0) {
+      console.log(`[VideoCard] Rendering ${user.username} with ${trackCount} tracks:`, tracks.map(t => t.kind));
+    }
+
     if (video.srcObject !== stream) {
       video.srcObject = stream;
     }
-    video.play().catch(() => {});
-  }, [stream, trackCount]);
+
+    // Browsers sometimes need a manual play() if tracks are added to an existing stream
+    video.play().catch(err => {
+      if (err.name !== 'AbortError' && trackCount > 0) {
+        console.warn(`[VideoCard] Autoplay blocked for ${user.username}:`, err.message);
+      }
+    });
+  }, [stream, trackCount, user.username]);
 
   const initial = user.username?.charAt(0).toUpperCase() || '?';
 
