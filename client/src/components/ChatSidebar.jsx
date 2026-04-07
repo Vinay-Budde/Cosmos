@@ -170,8 +170,8 @@ export default function ChatSidebar({ open, onClose, socket, myUser, messages, t
 
         {/* Input area */}
         <div
-          className="border-t border-slate-200 p-3 shrink-0 bg-white"
-          style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}
+          className="relative border-t border-slate-200 p-3 shrink-0 bg-white"
+          style={{ paddingBottom: 'calc(0.75rem + env(safe-area-bottom-inset))' }}
         >
           <form onSubmit={handleSend} className="relative mb-2 flex items-center gap-2">
             <input
@@ -197,31 +197,30 @@ export default function ChatSidebar({ open, onClose, socket, myUser, messages, t
           </form>
 
           {/* Formatting toolbar */}
-          <div className="flex items-center gap-[5px] px-1 overflow-x-auto no-scrollbar relative">
-            <div className="relative">
-              <ToolIcon 
-                icon={<Smile />} 
-                onClick={() => setShowEmojiPicker(!showEmojiPicker)} 
-                active={showEmojiPicker}
-              />
-              {showEmojiPicker && (
-                <div className="absolute bottom-full left-0 mb-2 z-[600] shadow-2xl animate-in slide-in-from-bottom-2 fade-in">
-                  <div className="fixed inset-0" onClick={() => setShowEmojiPicker(false)} />
-                  <div className="relative">
-                    <EmojiPicker 
-                      onEmojiClick={onEmojiClick}
-                      autoFocusSearch={false}
-                      theme={Theme.LIGHT}
-                      width={280}
-                      height={350}
-                      searchPlaceHolder="Search emojis..."
-                      previewConfig={{ showPreview: false }}
-                      skinTonesDisabled
-                    />
-                  </div>
-                </div>
-              )}
+          {showEmojiPicker && (
+            <div className="absolute bottom-full left-3 mb-2 z-[600] shadow-2xl animate-in slide-in-from-bottom-2 fade-in">
+              <div className="fixed inset-0" onClick={() => setShowEmojiPicker(false)} />
+              <div className="relative">
+                <EmojiPicker 
+                  onEmojiClick={onEmojiClick}
+                  autoFocusSearch={false}
+                  theme={Theme.LIGHT}
+                  width={280}
+                  height={350}
+                  searchPlaceHolder="Search emojis..."
+                  previewConfig={{ showPreview: false }}
+                  skinTonesDisabled
+                />
+              </div>
             </div>
+          )}
+
+          <div className="flex items-center gap-[5px] px-1 overflow-x-auto no-scrollbar relative">
+            <ToolIcon 
+              icon={<Smile />} 
+              onClick={() => setShowEmojiPicker(!showEmojiPicker)} 
+              active={showEmojiPicker}
+            />
             <ToolIcon icon={<Paperclip />} />
             <div className="w-px h-3 bg-slate-200 mx-1" />
             <ToolIcon icon={<Bold />} />

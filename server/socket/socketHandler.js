@@ -44,23 +44,42 @@ module.exports = (io) => {
       io.to(targetSocketId).emit('proximity_disconnect', { targetSocketId: socket.id });
     });
 
-    // Chat messages (Directed to nearby users)
-    socket.on('send_message', async ({ targetIds, message }) => {
+    // Chat messages
+    socket.on('send_message', async ({ targetIds, message, roomId }) => {
       const user = await User.findOne({ socketId: socket.id });
       if (!user) return;
+      
       const timestamp = new Date();
       const payload = {
         sender: user.username,
         senderId: socket.id,
         color: user.color,
         message,
-        timestamp
+        timestamp,
+        roomId
       };
-      // Send to self
-      socket.emit('receive_message', payload);
-      // Send to all nearby targets
-      if (Array.isArray(targetIds)) {
-        targetIds.forEach(id => io.to(id).emit('receive_message', payload));
+
+      if (roomId) {
+        // Save to DB for persistence
+        try {
+          await Message.create({
+             roomId,
+             sender: user.username,
+             senderId: socket.id,
+             message,
+             timestamp
+          });
+        } catch (dbErr) {
+          console.error("Message save error:", dbErr);
+        }
+        // Broadcast to everyone for a general room
+        io.emit('receive_message', payload);
+      } else {
+        // Directed to nearby users
+        socket.emit('receive_message', payload); // Send to self
+        if (Array.isArray(targetIds)) {
+          targetIds.forEach(id => io.to(id).emit('receive_message', payload));
+        }
       }
     });
 

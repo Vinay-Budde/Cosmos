@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Send, X } from 'lucide-react';
 
-export default function ChatPanel({ partner, roomId, socket, myUser }) {
+export default function ChatPanel({ partner, roomId, socket, myUser, onClose }) {
   const [messages, setMessages] = useState([]);
   const [inputValue, setInputValue] = useState('');
   const endOfMessagesRef = useRef(null);
@@ -22,7 +22,11 @@ export default function ChatPanel({ partner, roomId, socket, myUser }) {
     if (!socket) return;
     
     const handleMessage = (msg) => {
-      setMessages(prev => [...prev, msg]);
+      // If a message has a roomId and it matches our current roomId, or if it doesn't have a roomId (old compat), we add it.
+      // But actually we should only add messages meant for this room.
+      if (roomId && msg.roomId === roomId) {
+        setMessages(prev => [...prev, msg]);
+      }
     };
     
     socket.on('receive_message', handleMessage);
@@ -30,7 +34,7 @@ export default function ChatPanel({ partner, roomId, socket, myUser }) {
     return () => {
       socket.off('receive_message', handleMessage);
     };
-  }, [socket]);
+  }, [socket, roomId]);
 
   useEffect(() => {
     endOfMessagesRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -48,8 +52,10 @@ export default function ChatPanel({ partner, roomId, socket, myUser }) {
     <div className="w-full h-full flex flex-col bg-white">
       {/* Header */}
       <div className="p-4 border-b border-slate-200 flex items-center justify-between shadow-sm z-10 shrink-0">
-        <h2 className="font-semibold text-slate-800">Chat</h2>
-        <button className="text-slate-400 hover:text-slate-600">
+        <h2 className="font-semibold text-slate-800">
+           {roomId === 'general' ? 'General Chat' : 'Chat'}
+        </h2>
+        <button onClick={onClose} className="text-slate-400 hover:text-slate-600 p-1 hover:bg-slate-100 rounded-lg transition-colors">
           <X className="w-4 h-4" />
         </button>
       </div>

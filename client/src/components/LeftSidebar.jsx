@@ -2,7 +2,7 @@ import React from 'react';
 import { Search, Bell, Clock, Calendar, Video, Hash, ChevronDown, Settings, LayoutGrid, X } from 'lucide-react';
 import { showToast } from '../utils/toastEmitter';
 
-export default function LeftSidebar({ myUser, otherUsers, handRaisedBy = new Set(), mobileOpen, onMobileClose }) {
+export default function LeftSidebar({ myUser, otherUsers, handRaisedBy = new Set(), mobileOpen, onMobileClose, onOpenGeneralChat }) {
   const handleFeatureSoon = (name) => showToast(`${name} feature coming soon!`);
 
   return (
@@ -92,7 +92,7 @@ export default function LeftSidebar({ myUser, otherUsers, handRaisedBy = new Set
           <div className="flex flex-col gap-0.5">
             <NavItem icon={<Hash className="w-[18px] h-[18px] opacity-40" />} label="Threads"            onClick={() => handleFeatureSoon('Threads')} />
             <NavItem icon={<Hash className="w-[18px] h-[18px] opacity-40" />} label="doubts-discussions" onClick={() => handleFeatureSoon('Doubts')} />
-            <NavItem icon={<Hash className="w-[18px] h-[18px] opacity-40" />} label="general-chat"       onClick={() => handleFeatureSoon('General')} />
+            <NavItem icon={<Hash className="w-[18px] h-[18px] text-indigo-500" />} label="general-chat"  onClick={onOpenGeneralChat || (() => handleFeatureSoon('General'))} />
           </div>
         </div>
 

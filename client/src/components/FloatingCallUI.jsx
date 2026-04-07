@@ -32,28 +32,42 @@ export default function FloatingCallUI({
 
 function VideoCard({ user, stream, isLocal, micOn, cameraOn, iceState }) {
   const videoRef = useRef(null);
+  const audioRef = useRef(null);
 
   const tracks = stream ? stream.getTracks() : [];
   const trackCount = tracks.length;
 
   useEffect(() => {
-    const video = videoRef.current;
-    if (!video || !stream) return;
+    if (!stream) return;
 
     if (trackCount > 0) {
       console.log(`[VideoCard] Rendering ${user.username} with ${trackCount} tracks:`, tracks.map(t => t.kind));
     }
 
-    if (video.srcObject !== stream) {
-      video.srcObject = stream;
+    if (videoRef.current && videoRef.current.srcObject !== stream) {
+      videoRef.current.srcObject = stream;
+    }
+    
+    if (!isLocal && audioRef.current && audioRef.current.srcObject !== stream) {
+      audioRef.current.srcObject = stream;
     }
 
     // Browsers sometimes need a manual play() if tracks are added to an existing stream
-    video.play().catch(err => {
-      if (err.name !== 'AbortError' && trackCount > 0) {
-        console.warn(`[VideoCard] Autoplay blocked for ${user.username}:`, err.message);
-      }
-    });
+    if (videoRef.current) {
+      videoRef.current.play().catch(err => {
+        if (err.name !== 'AbortError' && trackCount > 0) {
+          console.warn(`[VideoCard] Video Autoplay blocked for ${user.username}:`, err.message);
+        }
+      });
+    }
+    
+    if (!isLocal && audioRef.current) {
+      audioRef.current.play().catch(err => {
+        if (err.name !== 'AbortError' && trackCount > 0) {
+          console.warn(`[VideoCard] Audio Autoplay blocked for ${user.username}:`, err.message);
+        }
+      });
+    }
   }, [stream, trackCount, user.username]);
 
   const initial = user.username?.charAt(0).toUpperCase() || '?';
@@ -71,14 +85,23 @@ function VideoCard({ user, stream, isLocal, micOn, cameraOn, iceState }) {
           boxShadow: `0 0 20px ${user.color || '#6366f1'}44`,
         }}
       >
-        {/* Video layer (always rendered if stream exists, to keep audio active) */}
+        {/* Video layer (always rendered if stream exists, video always muted, audio is separate) */}
         {stream && (
           <video
             ref={videoRef}
             autoPlay
             playsInline
-            muted={isLocal}
+            muted={true}
             className={`w-full h-full object-cover transition-opacity duration-500 ${cameraOn ? 'opacity-100' : 'opacity-0 absolute inset-0'}`}
+          />
+        )}
+        
+        {/* Standalone Audio layer for remote streams to ensure reliable playback on mobile */}
+        {!isLocal && stream && (
+          <audio
+            ref={audioRef}
+            autoPlay
+            playsInline
           />
         )}
 

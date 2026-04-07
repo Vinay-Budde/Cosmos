@@ -5,6 +5,7 @@ import TopBar from './TopBar';
 import LeftSidebar from './LeftSidebar';
 import BottomBar from './BottomBar';
 import ChatSidebar from './ChatSidebar';
+import ChatPanel from './ChatPanel';
 import FloatingCallUI from './FloatingCallUI';
 import FloatingReaction from './FloatingReaction';
 import MobileControls from './MobileControls';
@@ -23,6 +24,7 @@ export default function CosmosView({
   const [socket,          setSocket]          = useState(null);
   const [otherUsers,      setOtherUsers]      = useState([]);
   const [chatOpen,        setChatOpen]        = useState(false);
+  const [globalChatOpen,  setGlobalChatOpen]  = useState(false);
   const [messages,        setMessages]        = useState([]);
   const [typingUsers,     setTypingUsers]     = useState([]);
   const [localRoom,       setLocalRoom]       = useState('Spatial');
@@ -92,7 +94,12 @@ export default function CosmosView({
     s.on('proximity_disconnect', ({ targetSocketId }) => removePeerConnection(targetSocketId));
 
     // Chat
-    s.on('receive_message', (msg) => setMessages(prev => [...prev, msg]));
+    s.on('receive_message', (msg) => {
+      // Proximity chat sidebar only shows local messages that do NOT have a roomId
+      if (!msg.roomId) {
+        setMessages(prev => [...prev, msg]);
+      }
+    });
     s.on('user_typing', ({ username }) => {
       setTypingUsers(prev => prev.includes(username) ? prev : [...prev, username]);
       setTimeout(() => setTypingUsers(prev => prev.filter(u => u !== username)), 2500);
@@ -161,6 +168,7 @@ export default function CosmosView({
           handRaisedBy={handRaisedBy}
           mobileOpen={mobileSidebarOpen}
           onMobileClose={() => setMobileSidebarOpen(false)}
+          onOpenGeneralChat={() => { setGlobalChatOpen(true); setChatOpen(false); setMobileSidebarOpen(false); }}
         />
 
         <div className="flex-1 relative overflow-hidden">
@@ -236,6 +244,37 @@ export default function CosmosView({
           nearbyUsers={activeParticipants}
           partner={chatPartner}
         />
+
+        {globalChatOpen && (
+          <div
+            className="md:hidden fixed inset-0 bg-black/40 z-[400] backdrop-blur-sm"
+            onClick={() => setGlobalChatOpen(false)}
+          />
+        )}
+
+        <div
+          className={`
+            bg-white flex flex-col z-[500] shadow-2xl overflow-hidden
+            /* Mobile: fixed full-screen modal sliding up */
+            md:relative md:h-full md:transition-all md:duration-300 md:ease-in-out md:shrink-0
+            fixed left-0 right-0 bottom-0 transition-all duration-300 ease-in-out
+            rounded-t-2xl md:rounded-none
+            ${globalChatOpen
+              ? 'md:w-[320px] md:min-w-[320px] md:border-l md:border-gray-200 top-[10%] md:top-auto'
+              : 'md:w-0 md:min-w-0 md:border-none top-full md:top-auto'
+            }
+          `}
+          style={{ borderLeft: 'none' }}
+        >
+          {globalChatOpen && (
+            <ChatPanel
+              roomId="general"
+              socket={socket}
+              myUser={myUserObj}
+              onClose={() => setGlobalChatOpen(false)}
+            />
+          )}
+        </div>
       </div>
 
       <BottomBar
