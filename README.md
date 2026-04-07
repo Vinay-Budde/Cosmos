@@ -1,35 +1,25 @@
 # 🌌 Virtual Cosmos
 
-A real-time multiplayer virtual space where users can move around a 2D pixel-art world and chat with others based on proximity — just like a virtual office.
-
-🚀 Try it live: https://cosmos-gules.vercel.app/ — open in multiple tabs to see real-time multiplayer in action!
-
+A real-time multiplayer virtual space where users move around a 2D pixel-art world and chat with others based on proximity — just like a virtual office.
+🚀 Live Demo: cosmos-gules.vercel.app — open in multiple tabs to see real-time multiplayer in action!
 
 ✨ Features
 
 🎮 Move your avatar with WASD or Arrow keys
-💬 Proximity-based chat — conversations open automatically when you get close to someone and close when you move away
+💬 Proximity-based chat — conversations open automatically when near someone and close when you move away
 🎨 Customize your avatar with a name and color
 🗺️ Explore a pixel-art 2D map rendered with PixiJS
 ⚡ Real-time communication powered by Socket.IO
-
-
-🔗 Live Demo
-👉 cosmos-gules.vercel.app
-
-No installation needed — just open the link
-Open in multiple browser tabs or windows to test multiplayer
-Enter a name, pick a color, and start exploring!
 
 
 🛠️ Tech Stack
 LayerTechnologyFrontendReact + Vite + PixiJS + Tailwind CSSBackendNode.js + Express + Socket.IODatabaseMongoDB (Mongoose)
 
 📋 Prerequisites
-Before you begin, make sure you have the following installed:
+Make sure you have the following installed before getting started:
 
 Node.js >= 18
-MongoDB running locally or a MongoDB Atlas URI
+MongoDB running locally, or a MongoDB Atlas URI
 
 
 🚀 Getting Started
@@ -38,6 +28,7 @@ bashgit clone https://github.com/your-username/virtual-cosmos.git
 cd virtual-cosmos
 
 💡 Replace the GitHub URL with your actual repository URL.
+
 
 2. Set Up the Backend
 bashcd server
@@ -54,11 +45,13 @@ npm run dev
 
 # OR Production
 node index.js
+
 3. Set Up the Frontend
 Open a new terminal window:
 bashcd client
 npm install
 npm run dev
+
 4. Open the App
 Navigate to http://localhost:5173 in your browser.
 
@@ -75,16 +68,16 @@ Walk away → the chat window closes automatically
 
 📁 Project Structure
 virtual-cosmos/
-├── client/               # Frontend (React + Vite + PixiJS)
+├── client/                  # Frontend (React + Vite + PixiJS)
 │   ├── src/
-│   │   ├── components/   # React components
-│   │   ├── game/         # PixiJS game logic & map
-│   │   └── main.jsx      # App entry point
+│   │   ├── components/      # React components
+│   │   ├── game/            # PixiJS game logic & map
+│   │   └── main.jsx         # App entry point
 │   └── package.json
 │
-└── server/               # Backend (Node.js + Express + Socket.IO)
-    ├── index.js          # Server entry point
-    ├── .env              # Environment variables (create this)
+└── server/                  # Backend (Node.js + Express + Socket.IO)
+    ├── index.js             # Server entry point
+    ├── .env                 # Environment variables (create this)
     └── package.json
 
 🌐 Environment Variables
@@ -92,32 +85,35 @@ VariableDefaultDescriptionPORT3000Port the backend server runs onMONGO_URImongod
 
 🚢 Deployment
 The frontend is deployed on Vercel at cosmos-gules.vercel.app.
-To deploy your own instance:
-Frontend (Vercel):
+Frontend (Vercel)
 
 Push the /client folder to a GitHub repository
 Import the project on vercel.com
 Set the root directory to client and deploy
 
-Backend:
+Backend
 
-Deploy the /server folder to any Node.js host (Railway, Render, Fly.io, etc.)
+Deploy the /server folder to any Node.js host (e.g., Railway, Render, Fly.io)
 Set the environment variables (PORT, MONGO_URI) in the host dashboard
 Update the Socket.IO server URL in the frontend config to point to your deployed backend
 
 
 🤝 Contributing
 Contributions are welcome! Feel free to open an issue or submit a pull request.
+bash# 1. Fork the repository
 
-Fork the repository
-Create your feature branch: git checkout -b feature/my-feature
-Commit your changes: git commit -m 'Add my feature'
-Push to the branch: git push origin feature/my-feature
-Open a Pull Request
+# 2. Create your feature branch
+git checkout -b feature/my-feature
 
+# 3. Commit your changes
+git commit -m 'Add my feature'
+
+# 4. Push to the branch
+git push origin feature/my-feature
+
+# 5. Open a Pull Request
 
 📄 License
 This project is licensed under the MIT License.
-
 
 Built with ❤️ using React, PixiJS, and Socket.IO  |  🌐 Live at cosmos-gules.vercel.app
