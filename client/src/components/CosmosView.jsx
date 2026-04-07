@@ -75,8 +75,8 @@ export default function CosmosView({
       setOtherUsers(prev => prev.map(u => u.socketId === socketId ? { ...u, micOn, cameraOn } : u));
     });
 
-    s.on('user_moved',  ({ socketId, x, y, room, micOn, cameraOn }) =>
-      setOtherUsers(prev => prev.map(u => u.socketId === socketId ? { ...u, x, y, room, micOn, cameraOn } : u))
+    s.on('user_moved',  ({ socketId, x, y, room }) =>
+      setOtherUsers(prev => prev.map(u => u.socketId === socketId ? { ...u, x, y, room } : u))
     );
     s.on('user_left', ({ socketId }) => {
       setOtherUsers(prev => prev.filter(u => u.socketId !== socketId));

@@ -30,9 +30,9 @@ module.exports = (io) => {
       });
     });
 
-    socket.on('position_update', async ({ x, y, room, micOn, cameraOn }) => {
-      await User.findOneAndUpdate({ socketId: socket.id }, { x, y, room, micOn, cameraOn });
-      socket.broadcast.emit('user_moved', { socketId: socket.id, x, y, room, micOn, cameraOn });
+    socket.on('position_update', async ({ x, y, room }) => {
+      await User.findOneAndUpdate({ socketId: socket.id }, { x, y, room });
+      socket.broadcast.emit('user_moved', { socketId: socket.id, x, y, room });
     });
 
     // Proximity signaling
@@ -97,7 +97,12 @@ module.exports = (io) => {
       socket.broadcast.emit('hand_raise', { socketId: socket.id, raised });
     });
 
-    socket.on('media_status_update', ({ micOn, cameraOn }) => {
+    socket.on('media_status_update', async ({ micOn, cameraOn }) => {
+      try {
+        await User.findOneAndUpdate({ socketId: socket.id }, { micOn, cameraOn });
+      } catch (err) {
+        console.error("Error updating media status in DB:", err);
+      }
       socket.broadcast.emit('media_status_update', { socketId: socket.id, micOn, cameraOn });
     });
 

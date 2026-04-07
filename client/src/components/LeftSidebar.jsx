@@ -100,9 +100,9 @@ export default function LeftSidebar({ myUser, otherUsers, handRaisedBy = new Set
         <div className="mt-6 px-2 pb-12">
           <SectionHeader label="Team" />
           <div className="flex flex-col gap-2 pt-1">
-            {myUser && <TeamMember user={myUser} isMe status={myUser.room || 'Spatial'} />}
+            {myUser && <TeamMember user={myUser} isMe status={myUser.room || 'Spatial'} handRaised={handRaisedBy.has(myUser.socketId)} />}
             {otherUsers.map((u) => (
-              <TeamMember key={u.socketId} user={u} status={u.room || 'Spatial'} />
+              <TeamMember key={u.socketId} user={u} status={u.room || 'Spatial'} handRaised={handRaisedBy.has(u.socketId)} />
             ))}
           </div>
         </div>
