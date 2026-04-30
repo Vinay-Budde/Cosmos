@@ -48,7 +48,18 @@ export default function BottomBar({
       showToast('🔴 Recording stopped');
     } else {
       try {
-        const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+        const canvas = document.querySelector('canvas');
+        if (!canvas) {
+          showToast('Error: No scene found to record');
+          return;
+        }
+        
+        const stream = canvas.captureStream(30);
+        
+        if (localStream && localStream.getAudioTracks().length > 0) {
+          stream.addTrack(localStream.getAudioTracks()[0]);
+        }
+
         const mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
         mediaRecorderRef.current = mediaRecorder;
         recordedChunksRef.current = [];
@@ -74,16 +85,9 @@ export default function BottomBar({
         mediaRecorder.start();
         setIsRecording(true);
         showToast('🔴 Recording started');
-
-        stream.getVideoTracks()[0].onended = () => {
-          if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-            mediaRecorderRef.current.stop();
-            setIsRecording(false);
-            showToast('🔴 Recording stopped');
-          }
-        };
       } catch (err) {
-        showToast('Recording cancelled or not supported');
+        console.error(err);
+        showToast('Recording failed or not supported');
       }
     }
   };
