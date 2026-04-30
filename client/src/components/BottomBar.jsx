@@ -2,13 +2,13 @@ import React, { useState } from 'react';
 import {
   Mic, MicOff, Video, VideoOff, MonitorUp, UserPlus,
   CircleDot, Move, Hand, ThumbsUp, Zap, MessageSquare,
-  LayoutGrid, LogOut, MoreHorizontal, X
+  LayoutGrid, LogOut, MoreHorizontal, Hash
 } from 'lucide-react';
 import { showToast } from '../utils/toastEmitter';
 
 export default function BottomBar({
-  myUser, chatOpen, setChatOpen, socket,
-  micOn, cameraOn, onToggleMic, onToggleCamera,
+  myUser, chatOpen, setChatOpen, globalChatOpen, onOpenGeneralChat,
+  socket, micOn, cameraOn, onToggleMic, onToggleCamera,
   hasNearby, localStream
 }) {
   const [handRaised,    setHandRaised]    = useState(false);
@@ -30,11 +30,11 @@ export default function BottomBar({
 
   const handleShare = async () => {
     try {
-      const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+      const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
       showToast('📺 Screen sharing started');
       screenStream.getVideoTracks()[0].onended = () => showToast('Screen sharing stopped');
     } catch {
-      showToast('Screen share cancelled or unsupported');
+      showToast('Screen share cancelled or not supported');
     }
   };
 
@@ -47,6 +47,14 @@ export default function BottomBar({
     });
   };
 
+  const handleToggleProximityChat = () => {
+    if (hasNearby) {
+      setChatOpen(prev => !prev);
+    } else {
+      showToast('Move closer to someone to chat!');
+    }
+  };
+
   return (
     <div
       className="fixed bottom-0 w-full z-[1000] flex items-center px-2 sm:px-4"
@@ -54,7 +62,7 @@ export default function BottomBar({
     >
       {/* Left: Identity + Media */}
       <div className="flex items-center gap-0.5 sm:gap-1 w-auto sm:w-1/3">
-        {/* Avatar — always shown */}
+        {/* Avatar */}
         <div className="flex flex-col items-center justify-center p-1 sm:p-1.5 rounded-lg hover:bg-white/5 cursor-pointer transition-colors">
           <div
             className="w-[28px] h-[28px] rounded-lg flex items-center justify-center border-2 border-white relative shadow-sm"
@@ -93,7 +101,7 @@ export default function BottomBar({
         </div>
       </div>
 
-      {/* Center: Tools — compressed on mobile */}
+      {/* Center: Tools */}
       <div className="flex items-center justify-center gap-0.5 sm:gap-1 flex-1">
         {/* Desktop: full tool row */}
         <div className="hidden sm:flex items-center gap-1">
@@ -134,7 +142,7 @@ export default function BottomBar({
           )}
         </div>
 
-        {/* Mobile: "More" button for extra tools */}
+        {/* Mobile: "More" button */}
         <div className="sm:hidden relative">
           <IconButton
             icon={<MoreHorizontal className={showMore ? 'text-indigo-400' : ''} />}
@@ -143,11 +151,12 @@ export default function BottomBar({
             onClick={() => { setShowMore(!showMore); setShowReactions(false); }}
           />
           {showMore && (
-            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-[#1a1a2e] border border-white/10 rounded-xl shadow-2xl z-50 py-2 min-w-[160px]">
-              <MobileMenuItem icon={<UserPlus className="w-4 h-4" />}  label="Invite"       onClick={() => { handleInvite(); setShowMore(false); }} />
-              <MobileMenuItem icon={<MonitorUp className="w-4 h-4" />} label="Share Screen" onClick={() => { handleShare(); setShowMore(false); }} />
-              <MobileMenuItem icon={<CircleDot className="w-4 h-4" />} label="Record"       onClick={() => { showToast('🔴 Not available'); setShowMore(false); }} />
-              <MobileMenuItem icon={<Zap className="w-4 h-4" />}       label="Action"       onClick={() => { showToast('⚡ Coming soon!'); setShowMore(false); }} />
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-[#1a1a2e] border border-white/10 rounded-xl shadow-2xl z-50 py-2 min-w-[170px]">
+              <MobileMenuItem icon={<UserPlus className="w-4 h-4" />}   label="Invite"        onClick={() => { handleInvite(); setShowMore(false); }} />
+              <MobileMenuItem icon={<MonitorUp className="w-4 h-4" />}  label="Share Screen"  onClick={() => { handleShare(); setShowMore(false); }} />
+              <MobileMenuItem icon={<CircleDot className="w-4 h-4" />}  label="Record"        onClick={() => { showToast('🔴 Not available'); setShowMore(false); }} />
+              <MobileMenuItem icon={<Hash className="w-4 h-4" />}       label="General Chat"  onClick={() => { onOpenGeneralChat?.(); setShowMore(false); }} />
+              <MobileMenuItem icon={<Zap className="w-4 h-4" />}        label="Action"        onClick={() => { showToast('⚡ Coming soon!'); setShowMore(false); }} />
             </div>
           )}
         </div>
@@ -158,12 +167,13 @@ export default function BottomBar({
         </div>
       </div>
 
-      {/* Right: Chat + Apps + Leave */}
+      {/* Right: Proximity Chat + General Chat + Apps + Leave */}
       <div className="flex items-center justify-end gap-0.5 sm:gap-1 w-auto sm:w-1/3">
-        {/* Chat */}
+
+        {/* Proximity Chat */}
         <div className="relative group">
           <button
-            onClick={() => hasNearby ? setChatOpen(!chatOpen) : null}
+            onClick={handleToggleProximityChat}
             className={`flex flex-col items-center justify-center w-12 sm:w-14 h-14 rounded-xl transition-all
               ${hasNearby
                 ? chatOpen
@@ -173,13 +183,28 @@ export default function BottomBar({
               }`}
           >
             <MessageSquare className="w-[18px] h-[18px] sm:w-[20px] sm:h-[20px] mb-[4px]" />
-            <span className="tracking-tight font-bold" style={{ fontSize: '10px' }}>Chat</span>
+            <span className="tracking-tight font-bold" style={{ fontSize: '10px' }}>Nearby</span>
           </button>
           {!hasNearby && (
-            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-black/80 text-white text-[10px] rounded-lg whitespace-nowrap pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-black/80 text-white text-[10px] rounded-lg whitespace-nowrap pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-50">
               Move closer to someone
             </div>
           )}
+        </div>
+
+        {/* General Chat — always available */}
+        <div className="hidden sm:block">
+          <button
+            onClick={onOpenGeneralChat}
+            className={`flex flex-col items-center justify-center w-12 sm:w-14 h-14 rounded-xl transition-all
+              ${globalChatOpen
+                ? 'bg-[#2a2a44] text-indigo-400 shadow-md ring-1 ring-white/10'
+                : 'text-white/40 hover:bg-white/5 hover:text-white'
+              }`}
+          >
+            <Hash className="w-[18px] h-[18px] sm:w-[20px] sm:h-[20px] mb-[4px]" />
+            <span className="tracking-tight font-bold" style={{ fontSize: '10px' }}>General</span>
+          </button>
         </div>
 
         {/* Apps — desktop only */}

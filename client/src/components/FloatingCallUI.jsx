@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { MicOff, VideoOff } from 'lucide-react';
 
 export default function FloatingCallUI({
-  myUser, participants, localStream, remoteStreams, iceStates, micOn, cameraOn
+  myUser, participants, localStream, remoteStreams, iceStates, micOn, cameraOn, isDeafened
 }) {
   const allParticipants = [
     { ...myUser, isLocal: true },
@@ -24,19 +24,21 @@ export default function FloatingCallUI({
           micOn={user.isLocal ? micOn : user.micOn}
           cameraOn={user.isLocal ? cameraOn : user.cameraOn}
           iceState={user.isLocal ? 'connected' : iceStates?.[user.socketId]}
+          isDeafened={isDeafened}
         />
       ))}
     </div>
   );
 }
 
-function VideoCard({ user, stream, isLocal, micOn, cameraOn, iceState }) {
+function VideoCard({ user, stream, isLocal, micOn, cameraOn, iceState, isDeafened }) {
   const videoRef = useRef(null);
   const audioRef = useRef(null);
 
   const tracks = stream ? stream.getTracks() : [];
   const trackCount = tracks.length;
 
+  // Attach stream to <video> and <audio> elements whenever stream/tracks change
   useEffect(() => {
     if (!stream) return;
 
@@ -44,31 +46,40 @@ function VideoCard({ user, stream, isLocal, micOn, cameraOn, iceState }) {
       console.log(`[VideoCard] Rendering ${user.username} with ${trackCount} tracks:`, tracks.map(t => t.kind));
     }
 
+    // Attach to video element
     if (videoRef.current && videoRef.current.srcObject !== stream) {
       videoRef.current.srcObject = stream;
     }
-    
+
+    // Attach to dedicated audio element for remote streams
     if (!isLocal && audioRef.current && audioRef.current.srcObject !== stream) {
       audioRef.current.srcObject = stream;
     }
 
-    // Browsers sometimes need a manual play() if tracks are added to an existing stream
+    // Trigger play — browsers sometimes require a manual play() after srcObject is set
     if (videoRef.current) {
       videoRef.current.play().catch(err => {
         if (err.name !== 'AbortError' && trackCount > 0) {
-          console.warn(`[VideoCard] Video Autoplay blocked for ${user.username}:`, err.message);
+          console.warn(`[VideoCard] Video autoplay blocked for ${user.username}:`, err.message);
         }
       });
     }
-    
+
     if (!isLocal && audioRef.current) {
       audioRef.current.play().catch(err => {
         if (err.name !== 'AbortError' && trackCount > 0) {
-          console.warn(`[VideoCard] Audio Autoplay blocked for ${user.username}:`, err.message);
+          console.warn(`[VideoCard] Audio autoplay blocked for ${user.username}:`, err.message);
         }
       });
     }
-  }, [stream, trackCount, user.username]);
+  }, [stream, trackCount, user.username, isLocal]);
+
+  // Honour the deafen toggle independently — no need to re-attach the stream
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.muted = !!isDeafened;
+    }
+  }, [isDeafened]);
 
   const initial = user.username?.charAt(0).toUpperCase() || '?';
 

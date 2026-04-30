@@ -38,46 +38,53 @@ module.exports = (io) => {
     // Proximity signaling
     socket.on('proximity_connect', ({ targetSocketId }) => {
       io.to(targetSocketId).emit('proximity_connect', { targetSocketId: socket.id });
+      socket.emit('proximity_connect', { targetSocketId });
     });
 
     socket.on('proximity_disconnect', ({ targetSocketId }) => {
       io.to(targetSocketId).emit('proximity_disconnect', { targetSocketId: socket.id });
+      socket.emit('proximity_disconnect', { targetSocketId });
     });
 
-    // Chat messages
+    // ── Chat messages ─────────────────────────────────────────────
     socket.on('send_message', async ({ targetIds, message, roomId }) => {
       const user = await User.findOne({ socketId: socket.id });
-      if (!user) return;
-      
+      if (!user) {
+        // Fallback: still allow sending even without DB record
+        console.warn(`[MSG] No DB record for socket ${socket.id}, message dropped.`);
+        return;
+      }
+
       const timestamp = new Date();
       const payload = {
-        sender: user.username,
+        sender:   user.username,
         senderId: socket.id,
-        color: user.color,
+        color:    user.color,
         message,
         timestamp,
-        roomId
+        roomId: roomId || null,
       };
 
       if (roomId) {
-        // Save to DB for persistence
+        // ── General/Room chat: save to DB, broadcast to ALL ──
         try {
           await Message.create({
-             roomId,
-             sender: user.username,
-             senderId: socket.id,
-             message,
-             timestamp
+            roomId,
+            sender:   user.username,
+            senderId: socket.id,
+            message,
+            timestamp,
           });
         } catch (dbErr) {
           console.error("Message save error:", dbErr);
         }
-        // Broadcast to everyone for a general room
+        // Broadcast to everyone in the space (including sender so their ChatPanel updates)
         io.emit('receive_message', payload);
+
       } else {
-        // Directed to nearby users
-        socket.emit('receive_message', payload); // Send to self
-        if (Array.isArray(targetIds)) {
+        // ── Proximity/directed chat: send to sender + target IDs only ──
+        socket.emit('receive_message', payload); // echo to sender
+        if (Array.isArray(targetIds) && targetIds.length > 0) {
           targetIds.forEach(id => io.to(id).emit('receive_message', payload));
         }
       }

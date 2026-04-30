@@ -165,27 +165,33 @@ export function useWebRTC(socket, localStream) {
   }, [drainCandidates]);
 
   // ── Sync local stream tracks with all open peers ──────────────
-  // Called whenever localStream reference changes (e.g. camera toggled on/off)
+  // Called whenever localStream reference changes (e.g. a new track was added).
+  // For enable/disable (mute/unmute), replaceTrack keeps the same sender
+  // so the remote peer sees the enabled state via the existing track object.
   useEffect(() => {
     if (!localStream) return;
     const tracks = localStream.getTracks();
-    console.log(`[WebRTC] Local stream updated: ${tracks.length} tracks`, tracks.map(t => t.kind));
+    console.log(`[WebRTC] Local stream updated: ${tracks.length} tracks`, tracks.map(t => `${t.kind}(enabled=${t.enabled})`));
 
     Object.entries(peers.current).forEach(([socketId, pc]) => {
       if (pc.connectionState === 'closed') return;
-      
+
       tracks.forEach(track => {
         const senders = pc.getSenders();
         const sender = senders.find(s => s.track?.kind === track.kind);
-        
+
         if (sender) {
-          console.log(`[WebRTC] Replacing ${track.kind} track for ${socketId}`);
-          sender.replaceTrack(track).catch(e => console.warn('[WebRTC] replaceTrack error:', e));
+          // If it's a different track object (e.g. new getUserMedia call), replace it.
+          // If it's the SAME track, replaceTrack is still safe — it's a no-op essentially
+          // but it ensures the sender's enabled state is propagated.
+          if (sender.track !== track) {
+            console.log(`[WebRTC] Replacing ${track.kind} track for ${socketId}`);
+            sender.replaceTrack(track).catch(e => console.warn('[WebRTC] replaceTrack error:', e));
+          }
         } else {
           console.log(`[WebRTC] Adding NEW ${track.kind} track for ${socketId}`);
           pc.addTrack(track, localStream);
-          // NEW: Adding a track often needs negotiation
-          // The onnegotiationneeded will fire automatically if we added a track
+          // onnegotiationneeded will fire automatically after addTrack
         }
       });
     });

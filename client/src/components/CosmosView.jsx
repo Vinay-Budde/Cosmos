@@ -25,7 +25,7 @@ export default function CosmosView({
   const [otherUsers,      setOtherUsers]      = useState([]);
   const [chatOpen,        setChatOpen]        = useState(false);
   const [globalChatOpen,  setGlobalChatOpen]  = useState(false);
-  const [messages,        setMessages]        = useState([]);
+  const [messages,        setMessages]        = useState([]);  // proximity-only
   const [typingUsers,     setTypingUsers]     = useState([]);
   const [localRoom,       setLocalRoom]       = useState('Spatial');
   const [nearbyIds,       setNearbyIds]       = useState([]);
@@ -87,20 +87,24 @@ export default function CosmosView({
 
     // Proximity-based WebRTC
     s.on('proximity_connect', ({ targetSocketId }) => {
-      // Tie-breaker: decide who initiates based on socket.id comparison
       const isInitiator = s.id > targetSocketId;
       console.log(`[WebRTC] Proximity match with ${targetSocketId}. I am initiator: ${isInitiator}`);
       createPeerConnection(targetSocketId, isInitiator);
     });
     s.on('proximity_disconnect', ({ targetSocketId }) => removePeerConnection(targetSocketId));
 
-    // Chat
+    // ── Chat: ONLY add to proximity messages if it has NO roomId ──
+    // General chat (roomId='general') is handled entirely by ChatPanel's own socket listener
     s.on('receive_message', (msg) => {
-      // Proximity chat sidebar only shows local messages that do NOT have a roomId
       if (!msg.roomId) {
+        // Proximity/direct message — add to sidebar
         setMessages(prev => [...prev, msg]);
       }
+      // Messages with roomId are intentionally NOT added here —
+      // ChatPanel has its own dedicated socket.on('receive_message') listener
+      // that handles filtering by roomId itself.
     });
+
     s.on('user_typing', ({ username }) => {
       setTypingUsers(prev => prev.includes(username) ? prev : [...prev, username]);
       setTimeout(() => setTypingUsers(prev => prev.filter(u => u !== username)), 2500);
@@ -108,7 +112,6 @@ export default function CosmosView({
 
     // Reactions — show floating emoji on map
     s.on('reaction', ({ socketId, emoji }) => {
-      const user = s._otherUsersSnapshot?.find?.(u => u.socketId === socketId);
       const id = `${socketId}_${Date.now()}`;
       setReactions(prev => [...prev, { id, emoji, socketId }]);
       setTimeout(() => setReactions(prev => prev.filter(r => r.id !== id)), 3000);
@@ -124,7 +127,7 @@ export default function CosmosView({
     });
 
     return () => { s.disconnect(); cleanupKeyboard(); };
-  }, [playerInfo]);
+  }, [playerInfo]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Broadcast media status changes
   useEffect(() => {
@@ -147,10 +150,27 @@ export default function CosmosView({
   const chatPartner = activeParticipants[0] || null;
   const hasNearby   = nearbyIds.length > 0;
 
-  // Auto-open/close chat on proximity change
+  // Auto-open proximity chat on entering range, auto-close on leaving
   useEffect(() => {
-    setChatOpen(nearbyIds.length > 0);
+    if (nearbyIds.length > 0) {
+      setChatOpen(true);
+    } else {
+      setChatOpen(false);
+    }
   }, [nearbyIds.length]);
+
+  // Mutual exclusion: closing one panel doesn't open the other
+  const openGeneralChat = () => {
+    setGlobalChatOpen(true);
+    setChatOpen(false);
+    setMobileSidebarOpen(false);
+  };
+
+  const openProximityChat = () => {
+    if (!hasNearby) return;
+    setChatOpen(prev => !prev);
+    setGlobalChatOpen(false);
+  };
 
   return (
     <div className="w-full h-screen bg-[#111120] overflow-hidden relative flex flex-col font-sans text-white">
@@ -171,7 +191,7 @@ export default function CosmosView({
           handRaisedBy={handRaisedBy}
           mobileOpen={mobileSidebarOpen}
           onMobileClose={() => setMobileSidebarOpen(false)}
-          onOpenGeneralChat={() => { setGlobalChatOpen(true); setChatOpen(false); setMobileSidebarOpen(false); }}
+          onOpenGeneralChat={openGeneralChat}
         />
 
         <div className="flex-1 relative overflow-hidden">
@@ -237,6 +257,7 @@ export default function CosmosView({
           )}
         </div>
 
+        {/* Proximity Chat Sidebar */}
         <ChatSidebar
           open={chatOpen}
           onClose={() => setChatOpen(false)}
@@ -249,6 +270,7 @@ export default function CosmosView({
           partner={chatPartner}
         />
 
+        {/* General Chat Panel — mobile backdrop */}
         {globalChatOpen && (
           <div
             className="md:hidden fixed inset-0 bg-black/40 z-[400] backdrop-blur-sm"
@@ -256,10 +278,10 @@ export default function CosmosView({
           />
         )}
 
+        {/* General Chat Panel */}
         <div
           className={`
             bg-white flex flex-col z-[500] shadow-2xl overflow-hidden
-            /* Mobile: fixed full-screen modal sliding up */
             md:relative md:h-full md:transition-all md:duration-300 md:ease-in-out md:shrink-0
             fixed left-0 right-0 bottom-0 transition-all duration-300 ease-in-out
             rounded-t-2xl md:rounded-none
@@ -285,6 +307,8 @@ export default function CosmosView({
         myUser={myUserObj}
         chatOpen={chatOpen}
         setChatOpen={setChatOpen}
+        globalChatOpen={globalChatOpen}
+        onOpenGeneralChat={openGeneralChat}
         socket={socket}
         micOn={micOn}
         cameraOn={cameraOn}

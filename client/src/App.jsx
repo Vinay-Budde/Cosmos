@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import JoinScreen from './components/JoinScreen';
 import CosmosView from './components/CosmosView';
 import ToastManager from './components/ToastManager';
@@ -9,10 +9,12 @@ function App() {
   const [playerInfo, setPlayerInfo] = useState(null);
   const media = useMediaStream();
 
+  // Start stream once on mount — we call via a stable ref to avoid
+  // re-triggering if the hook identity changes between renders.
+  const startStreamRef = useRef(media.startStream);
   useEffect(() => {
-    // Initial hardware check & request
-    media.startStream(true, true);
-  }, []);
+    startStreamRef.current(true, true);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <>

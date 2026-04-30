@@ -9,6 +9,11 @@ server/.env
 client/.env
 *.env.local
 *.env.production
+*.env.development.local
+*.env.test.local
+*.env.production.local
+
+# NOTE: .env.example files ARE safe to commit — they contain no secrets
 
 # Build output
 client/dist/
@@ -17,11 +22,21 @@ client/build/
 # Logs
 *.log
 npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
 # OS files
 .DS_Store
 Thumbs.db
+desktop.ini
 
 # IDE
 .vscode/
 .idea/
+*.swp
+*.swo
+
+# Temporary build artifacts
+client/build_err.txt
+client/build_out.txt
+client/build_out_2.txt

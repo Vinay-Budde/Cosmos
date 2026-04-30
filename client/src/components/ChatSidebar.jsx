@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { X, Smile, Paperclip, Bold, Italic, Strikethrough, Link, Code, Send } from 'lucide-react';
 import EmojiPicker, { Theme } from 'emoji-picker-react';
 
@@ -6,10 +6,18 @@ export default function ChatSidebar({ open, onClose, socket, myUser, messages, t
   const [inputValue, setInputValue] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const endRef = useRef(null);
+  const inputRef = useRef(null);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, typingUsers]);
+
+  // Reset on open
+  useEffect(() => {
+    if (open) {
+      setShowEmojiPicker(false);
+    }
+  }, [open]);
 
   const handleInputChange = (e) => {
     setInputValue(e.target.value);
@@ -21,23 +29,88 @@ export default function ChatSidebar({ open, onClose, socket, myUser, messages, t
 
   const handleSend = (e) => {
     e.preventDefault();
-    if (!inputValue.trim() || !socket || !hasNearby || nearbyUsers.length === 0) return;
+    const text = inputValue.trim();
+    if (!text || !socket || !hasNearby || nearbyUsers.length === 0) return;
     const targetIds = nearbyUsers.map(u => u.socketId);
-    socket.emit('send_message', { targetIds, message: inputValue.trim() });
+    socket.emit('send_message', { targetIds, message: text });
     setInputValue('');
+    setShowEmojiPicker(false);
+    inputRef.current?.focus();
   };
-  
+
   const onEmojiClick = (emojiData) => {
     setInputValue(prev => prev + emojiData.emoji);
-    // Don't close picker automatically to allow multiple emojis
+    inputRef.current?.focus();
+  };
+
+  // ── Formatting helpers ──────────────────────────────────────────
+  const wrapSelection = useCallback((before, after = before) => {
+    const el = inputRef.current;
+    if (!el) return;
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const selected = inputValue.slice(start, end);
+    const newText = inputValue.slice(0, start) + before + selected + after + inputValue.slice(end);
+    setInputValue(newText);
+    // Restore caret after state update
+    requestAnimationFrame(() => {
+      el.focus();
+      const caret = selected ? start + before.length + selected.length + after.length : start + before.length;
+      el.setSelectionRange(caret, caret);
+    });
+  }, [inputValue]);
+
+  const insertLink = useCallback(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const selected = inputValue.slice(start, end);
+    const label = selected || 'link text';
+    const newText = inputValue.slice(0, start) + `[${label}](url)` + inputValue.slice(end);
+    setInputValue(newText);
+    requestAnimationFrame(() => {
+      el.focus();
+      // Select "url" for easy replacement
+      const urlStart = start + label.length + 3;
+      el.setSelectionRange(urlStart, urlStart + 3);
+    });
+  }, [inputValue]);
+
+  const handleFileAttach = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*,video/*,.pdf,.doc,.docx,.txt';
+    input.onchange = () => {
+      if (input.files?.[0]) {
+        const fname = input.files[0].name;
+        setInputValue(prev => prev + `[📎 ${fname}]`);
+        inputRef.current?.focus();
+      }
+    };
+    input.click();
+  };
+
+  const formatTime = (ts) => {
+    try { return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
+    catch { return ''; }
+  };
+
+  // Render message content with basic markdown formatting
+  const renderContent = (text) => {
+    if (!text) return null;
+    // Bold **text**
+    let processed = text
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.*?)\*/g, '<em>$1</em>')
+      .replace(/~~(.*?)~~/g, '<del>$1</del>')
+      .replace(/`(.*?)`/g, '<code style="background:rgba(0,0,0,0.12);padding:1px 4px;border-radius:3px;font-size:11px">$1</code>')
+      .replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g, '<a href="$2" target="_blank" rel="noopener" style="text-decoration:underline;opacity:0.8">$1</a>');
+    return <span dangerouslySetInnerHTML={{ __html: processed }} />;
   };
 
   return (
     <>
-      {/* Mobile full-screen backdrop + slide-up panel */}
-      {/* On mobile (< md): fixed full-screen overlay sliding up from bottom */}
-      {/* On desktop (>= md): inline side panel with fixed width */}
-
       {/* Mobile backdrop */}
       {open && (
         <div
@@ -50,7 +123,6 @@ export default function ChatSidebar({ open, onClose, socket, myUser, messages, t
       <div
         className={`
           bg-white flex flex-col z-[500] shadow-2xl overflow-hidden
-          /* Mobile: fixed full-screen modal sliding up */
           md:relative md:h-full md:transition-all md:duration-300 md:ease-in-out md:shrink-0
           fixed left-0 right-0 bottom-0 transition-all duration-300 ease-in-out
           rounded-t-2xl md:rounded-none
@@ -69,7 +141,7 @@ export default function ChatSidebar({ open, onClose, socket, myUser, messages, t
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 shrink-0 bg-white">
           <div className="flex flex-col">
-            <h2 className="text-slate-800 font-bold text-[15px] tracking-wide">Chat</h2>
+            <h2 className="text-slate-800 font-bold text-[15px] tracking-wide">Proximity Chat</h2>
             {hasNearby && nearbyUsers.length > 0 && (
               <span className="text-[11px] text-emerald-600 font-semibold">
                 {nearbyUsers.map(u => u.username).join(', ')} nearby
@@ -85,7 +157,7 @@ export default function ChatSidebar({ open, onClose, socket, myUser, messages, t
         <div className="flex-1 overflow-y-auto flex flex-col bg-white custom-scrollbar">
           {!hasNearby ? (
             <div className="m-auto flex flex-col items-center justify-center p-8 text-center gap-4">
-              <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center border border-slate-200 animate-pulse">
+              <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center border border-slate-200">
                 <span className="text-3xl">🚶</span>
               </div>
               <div>
@@ -112,11 +184,11 @@ export default function ChatSidebar({ open, onClose, socket, myUser, messages, t
                     </span>
                   </div>
                   <p className="text-slate-700 font-semibold text-[14px] leading-snug">
-                    This is the beginning of your chat history with{' '}
-                    <span style={{ color: partner.color }} className="font-black">@{partner.username}</span>.
+                    Start chatting with{' '}
+                    <span style={{ color: partner.color }} className="font-black">@{partner.username}</span>!
                   </p>
                   <p className="text-slate-400 text-[12px] mt-2 leading-relaxed">
-                    Send messages, attachments, links, emojis, and more.
+                    You're in proximity range. Say hello! 👋
                   </p>
                 </>
               ) : (
@@ -129,39 +201,47 @@ export default function ChatSidebar({ open, onClose, socket, myUser, messages, t
               )}
             </div>
           ) : (
-            <div className="p-3 space-y-4 flex flex-col justify-end min-h-full">
+            <div className="p-3 space-y-3 flex flex-col justify-end min-h-full">
               {messages.map((msg, idx) => {
                 const isMe = msg.senderId === myUser?.socketId;
+                const showMeta = idx === 0 || messages[idx - 1]?.senderId !== msg.senderId;
                 return (
-                  <div key={idx} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
-                    <div className="flex items-center gap-1.5 mb-1">
-                      {!isMe && (
-                        <div
-                          className="w-[26px] h-[26px] rounded-full shrink-0 flex items-center justify-center border border-white shadow-sm"
-                          style={{ backgroundColor: msg.color }}
-                        >
-                          <span className="text-white text-[10px] font-bold">{msg.sender.charAt(0).toUpperCase()}</span>
-                        </div>
-                      )}
-                      <span className="font-bold text-[12px] text-slate-700">{msg.sender}</span>
-                      <span className="text-[10px] text-slate-400">
-                        {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </span>
-                    </div>
+                  <div key={`${msg.senderId}_${msg.timestamp}_${idx}`} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
+                    {showMeta && (
+                      <div className={`flex items-center gap-1.5 mb-1 ${isMe ? 'flex-row-reverse' : ''}`}>
+                        {!isMe && (
+                          <div
+                            className="w-[26px] h-[26px] rounded-full shrink-0 flex items-center justify-center border border-white shadow-sm"
+                            style={{ backgroundColor: msg.color }}
+                          >
+                            <span className="text-white text-[10px] font-bold">{msg.sender.charAt(0).toUpperCase()}</span>
+                          </div>
+                        )}
+                        <span className="font-bold text-[12px] text-slate-700">{isMe ? 'You' : msg.sender}</span>
+                        <span className="text-[10px] text-slate-400">{formatTime(msg.timestamp)}</span>
+                      </div>
+                    )}
                     <div
-                      className={`px-3 py-2 text-[13px] max-w-[85%] leading-relaxed shadow-sm rounded-2xl
+                      className={`px-3 py-2 text-[13px] max-w-[85%] leading-relaxed shadow-sm rounded-2xl break-words
                         ${isMe
                           ? 'bg-indigo-500 text-white rounded-tr-sm'
                           : 'bg-slate-100 text-slate-800 rounded-tl-sm'
                         }`}
                     >
-                      {msg.message}
+                      {renderContent(msg.message)}
                     </div>
                   </div>
                 );
               })}
               {typingUsers.length > 0 && typingUsers.map(u => (
-                <div key={u} className="text-[11px] text-slate-400 italic px-1">{u} is typing...</div>
+                <div key={u} className="flex items-center gap-2 text-slate-400 text-[11px] italic px-1">
+                  <div className="flex gap-0.5">
+                    <span className="w-1.5 h-1.5 bg-slate-300 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <span className="w-1.5 h-1.5 bg-slate-300 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <span className="w-1.5 h-1.5 bg-slate-300 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                  </div>
+                  {u} is typing...
+                </div>
               ))}
               <div ref={endRef} />
             </div>
@@ -171,16 +251,39 @@ export default function ChatSidebar({ open, onClose, socket, myUser, messages, t
         {/* Input area */}
         <div
           className="relative border-t border-slate-200 p-3 shrink-0 bg-white"
-          style={{ paddingBottom: 'calc(0.75rem + env(safe-area-bottom-inset))' }}
+          style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom, 0px))' }}
         >
+          {/* Emoji picker */}
+          {showEmojiPicker && (
+            <div className="absolute bottom-full left-0 right-0 z-[600]">
+              <div className="fixed inset-0" onClick={() => setShowEmojiPicker(false)} />
+              <div className="relative flex justify-center mb-1">
+                <div className="shadow-2xl rounded-2xl overflow-hidden">
+                  <EmojiPicker
+                    onEmojiClick={onEmojiClick}
+                    autoFocusSearch={false}
+                    theme={Theme.LIGHT}
+                    width={280}
+                    height={340}
+                    searchPlaceHolder="Search emojis..."
+                    previewConfig={{ showPreview: false }}
+                    skinTonesDisabled
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
           <form onSubmit={handleSend} className="relative mb-2 flex items-center gap-2">
             <input
+              ref={inputRef}
               type="text"
               value={inputValue}
               onChange={handleInputChange}
+              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) handleSend(e); }}
               disabled={!hasNearby}
-              placeholder={hasNearby ? 'Message the group' : 'Move closer to chat...'}
-              className={`flex-1 border rounded-xl py-2 px-3 text-[13px] focus:outline-none transition-all
+              placeholder={hasNearby ? 'Message nearby users...' : 'Move closer to chat...'}
+              className={`flex-1 border rounded-xl py-2.5 px-3 text-[13px] focus:outline-none transition-all
                 ${hasNearby
                   ? 'bg-slate-50 border-slate-200 text-slate-800 placeholder-slate-400 focus:border-indigo-400 focus:bg-white'
                   : 'bg-slate-50 border-slate-100 text-slate-300 placeholder-slate-300 cursor-not-allowed'
@@ -189,7 +292,8 @@ export default function ChatSidebar({ open, onClose, socket, myUser, messages, t
             {hasNearby && (
               <button
                 type="submit"
-                className="p-2 bg-indigo-500 hover:bg-indigo-600 rounded-xl text-white transition-colors"
+                disabled={!inputValue.trim()}
+                className={`p-2 rounded-xl transition-all shrink-0 ${inputValue.trim() ? 'bg-indigo-500 hover:bg-indigo-600 text-white' : 'bg-slate-100 text-slate-300 cursor-not-allowed'}`}
               >
                 <Send size={14} />
               </button>
@@ -197,38 +301,25 @@ export default function ChatSidebar({ open, onClose, socket, myUser, messages, t
           </form>
 
           {/* Formatting toolbar */}
-          {showEmojiPicker && (
-            <div className="absolute bottom-full left-3 mb-2 z-[600] shadow-2xl animate-in slide-in-from-bottom-2 fade-in">
-              <div className="fixed inset-0" onClick={() => setShowEmojiPicker(false)} />
-              <div className="relative">
-                <EmojiPicker 
-                  onEmojiClick={onEmojiClick}
-                  autoFocusSearch={false}
-                  theme={Theme.LIGHT}
-                  width={280}
-                  height={350}
-                  searchPlaceHolder="Search emojis..."
-                  previewConfig={{ showPreview: false }}
-                  skinTonesDisabled
-                />
-              </div>
-            </div>
-          )}
-
-          <div className="flex items-center gap-[5px] px-1 overflow-x-auto no-scrollbar relative">
-            <ToolIcon 
-              icon={<Smile />} 
-              onClick={() => setShowEmojiPicker(!showEmojiPicker)} 
+          <div className="flex items-center gap-[4px] px-1 overflow-x-auto no-scrollbar">
+            <ToolIcon
+              icon={<Smile />}
+              onClick={() => setShowEmojiPicker(!showEmojiPicker)}
               active={showEmojiPicker}
+              title="Emoji"
             />
-            <ToolIcon icon={<Paperclip />} />
+            <ToolIcon
+              icon={<Paperclip />}
+              onClick={handleFileAttach}
+              title="Attach file"
+            />
             <div className="w-px h-3 bg-slate-200 mx-1" />
-            <ToolIcon icon={<Bold />} />
-            <ToolIcon icon={<Italic />} />
-            <ToolIcon icon={<Strikethrough />} />
+            <ToolIcon icon={<Bold />} onClick={() => wrapSelection('**')} title="Bold (**text**)" />
+            <ToolIcon icon={<Italic />} onClick={() => wrapSelection('*')} title="Italic (*text*)" />
+            <ToolIcon icon={<Strikethrough />} onClick={() => wrapSelection('~~')} title="Strikethrough (~~text~~)" />
             <div className="w-px h-3 bg-slate-200 mx-1" />
-            <ToolIcon icon={<Link />} />
-            <ToolIcon icon={<Code />} />
+            <ToolIcon icon={<Link />} onClick={insertLink} title="Insert link" />
+            <ToolIcon icon={<Code />} onClick={() => wrapSelection('`')} title="Code (`code`)" />
           </div>
         </div>
       </div>
@@ -236,15 +327,16 @@ export default function ChatSidebar({ open, onClose, socket, myUser, messages, t
   );
 }
 
-function ToolIcon({ icon, onClick, active }) {
+function ToolIcon({ icon, onClick, active, title }) {
   return (
-    <button 
-      type="button" 
+    <button
+      type="button"
       onClick={onClick}
+      title={title}
       className={`
         p-[5px] rounded-lg transition-all shrink-0
-        ${active 
-          ? 'text-indigo-600 bg-indigo-50 border border-indigo-100' 
+        ${active
+          ? 'text-indigo-600 bg-indigo-50 border border-indigo-100'
           : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
         }
       `}
