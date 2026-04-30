@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import io from 'socket.io-client';
 import CosmosCanvas from './CosmosCanvas';
 import TopBar from './TopBar';
@@ -11,32 +11,67 @@ import FloatingReaction from './FloatingReaction';
 import MobileControls from './MobileControls';
 import { useWebRTC } from '../hooks/useWebRTC';
 import { initializeKeyboard } from '../hooks/useMovement';
+import { ROOMS, TILE_SIZE } from '../utils/mapLayout';
+import SearchModal from './SearchModal';
 import { Plus, Minus, Map } from 'lucide-react';
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
-console.log(`[Cosmos] Connecting to backend: ${SOCKET_URL}`);
 const SPAWN_X = 35 * 32;
 const SPAWN_Y = 32 * 32;
+
+const MAX_ACTIVITIES = 50;
+
+function nowStr() {
+  return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
 
 export default function CosmosView({
   playerInfo, localStream, micOn, cameraOn, toggleMic, toggleCamera
 }) {
-  const [socket,          setSocket]          = useState(null);
-  const [otherUsers,      setOtherUsers]      = useState([]);
-  const [chatOpen,        setChatOpen]        = useState(false);
-  const [globalChatOpen,  setGlobalChatOpen]  = useState(false);
-  const [messages,        setMessages]        = useState([]);  // proximity-only
-  const [typingUsers,     setTypingUsers]     = useState([]);
-  const [localRoom,       setLocalRoom]       = useState('Spatial');
-  const [nearbyIds,       setNearbyIds]       = useState([]);
-  const [reactions,       setReactions]       = useState([]);
-  const [handRaisedBy,    setHandRaisedBy]    = useState(new Set());
-  const [isConnected,     setIsConnected]     = useState(false);
-  const [zoom,            setZoom]            = useState(1.0);
+  const [socket,            setSocket]            = useState(null);
+  const [otherUsers,        setOtherUsers]        = useState([]);
+  const [chatOpen,          setChatOpen]          = useState(false);
+  const [channelOpen,       setChannelOpen]       = useState(false);
+  const [activeChannelId,   setActiveChannelId]   = useState('general');
+  const [messages,          setMessages]          = useState([]);
+  const [typingUsers,       setTypingUsers]       = useState([]);
+  const [localRoom,         setLocalRoom]         = useState('Spatial');
+  const [nearbyIds,         setNearbyIds]         = useState([]);
+  const [reactions,         setReactions]         = useState([]);
+  const [handRaisedBy,      setHandRaisedBy]      = useState(new Set());
+  const [isConnected,       setIsConnected]       = useState(false);
+  const [zoom,              setZoom]              = useState(1.0);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [isDeafened,        setDeafened]          = useState(false);
+  // New: activity feed & recent conversations
+  const [activities,          setActivities]          = useState([]);
+  const [recentConversations, setRecentConversations] = useState([]);
+  const [searchOpen,          setSearchOpen]          = useState(false);
+
+  // Teleport function ref — set by CosmosCanvas
+  const teleportFnRef = useRef(null);
 
   const { remoteStreams, iceStates, createPeerConnection, removePeerConnection } = useWebRTC(socket, localStream);
+
+  // Cmd+K / Ctrl+K global search shortcut
+  useEffect(() => {
+    const handler = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setSearchOpen(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
+
+  const addActivity = useCallback((icon, text, color) => {
+    setActivities(prev => {
+      const entry = { icon, text, color, timeStr: nowStr(), id: Date.now() + Math.random() };
+      const next = [...prev, entry];
+      return next.length > MAX_ACTIVITIES ? next.slice(-MAX_ACTIVITIES) : next;
+    });
+  }, []);
 
   // ── Socket setup ──────────────────────────────────────────────
   useEffect(() => {
@@ -45,64 +80,54 @@ export default function CosmosView({
     setSocket(s);
 
     s.on('connect', () => {
-      console.log(`[Cosmos] Connected to server! ID: ${s.id}`);
       setIsConnected(true);
       s.emit('join_cosmos', {
-        username: playerInfo.name,
-        color:    playerInfo.color,
-        x: SPAWN_X,
-        y: SPAWN_Y,
-        micOn,
-        cameraOn
+        username: playerInfo.name, color: playerInfo.color,
+        x: SPAWN_X, y: SPAWN_Y, micOn, cameraOn
       });
     });
 
-    s.on('connect_error', (err) => {
-      console.error('[Cosmos] Connection Error:', err.message);
-      setIsConnected(false);
+    s.on('connect_error', () => setIsConnected(false));
+    s.on('disconnect',    () => setIsConnected(false));
+
+    s.on('all_users', (users) => setOtherUsers(users));
+
+    s.on('user_joined', (user) => {
+      setOtherUsers(prev => {
+        if (prev.some(u => u.socketId === user.socketId)) return prev;
+        return [...prev, user];
+      });
+      addActivity('👋', `${user.username} joined the space`, user.color);
     });
 
-    s.on('disconnect', () => {
-      console.log('[Cosmos] Disconnected from server');
-      setIsConnected(false);
-    });
-
-    s.on('all_users',   (users) => setOtherUsers(users));
-    s.on('user_joined', (user)  => setOtherUsers(prev => {
-      if (prev.some(u => u.socketId === user.socketId)) return prev;
-      return [...prev, user];
-    }));
     s.on('media_status_update', ({ socketId, micOn, cameraOn }) => {
       setOtherUsers(prev => prev.map(u => u.socketId === socketId ? { ...u, micOn, cameraOn } : u));
     });
 
-    s.on('user_moved',  ({ socketId, x, y, room }) =>
+    s.on('user_moved', ({ socketId, x, y, room }) =>
       setOtherUsers(prev => prev.map(u => u.socketId === socketId ? { ...u, x, y, room } : u))
     );
+
     s.on('user_left', ({ socketId }) => {
-      setOtherUsers(prev => prev.filter(u => u.socketId !== socketId));
+      setOtherUsers(prev => {
+        const leaving = prev.find(u => u.socketId === socketId);
+        if (leaving) addActivity('👋', `${leaving.username} left the space`, leaving.color);
+        return prev.filter(u => u.socketId !== socketId);
+      });
       removePeerConnection(socketId);
       setHandRaisedBy(prev => { const n = new Set(prev); n.delete(socketId); return n; });
     });
 
-    // Proximity-based WebRTC
+    // Proximity WebRTC
     s.on('proximity_connect', ({ targetSocketId }) => {
       const isInitiator = s.id > targetSocketId;
-      console.log(`[WebRTC] Proximity match with ${targetSocketId}. I am initiator: ${isInitiator}`);
       createPeerConnection(targetSocketId, isInitiator);
     });
     s.on('proximity_disconnect', ({ targetSocketId }) => removePeerConnection(targetSocketId));
 
-    // ── Chat: ONLY add to proximity messages if it has NO roomId ──
-    // General chat (roomId='general') is handled entirely by ChatPanel's own socket listener
+    // Chat — proximity only (no roomId)
     s.on('receive_message', (msg) => {
-      if (!msg.roomId) {
-        // Proximity/direct message — add to sidebar
-        setMessages(prev => [...prev, msg]);
-      }
-      // Messages with roomId are intentionally NOT added here —
-      // ChatPanel has its own dedicated socket.on('receive_message') listener
-      // that handles filtering by roomId itself.
+      if (!msg.roomId) setMessages(prev => [...prev, msg]);
     });
 
     s.on('user_typing', ({ username }) => {
@@ -110,11 +135,17 @@ export default function CosmosView({
       setTimeout(() => setTypingUsers(prev => prev.filter(u => u !== username)), 2500);
     });
 
-    // Reactions — show floating emoji on map
+    // Reactions
     s.on('reaction', ({ socketId, emoji }) => {
       const id = `${socketId}_${Date.now()}`;
       setReactions(prev => [...prev, { id, emoji, socketId }]);
       setTimeout(() => setReactions(prev => prev.filter(r => r.id !== id)), 3000);
+      // Find who reacted
+      setOtherUsers(prev => {
+        const reactor = prev.find(u => u.socketId === socketId);
+        if (reactor) addActivity(emoji, `${reactor.username} reacted ${emoji}`, reactor.color);
+        return prev;
+      });
     });
 
     // Hand raise
@@ -124,17 +155,36 @@ export default function CosmosView({
         raised ? n.add(socketId) : n.delete(socketId);
         return n;
       });
+      setOtherUsers(prev => {
+        const user = prev.find(u => u.socketId === socketId);
+        if (user) addActivity(raised ? '✋' : '👇', `${user.username} ${raised ? 'raised their hand' : 'lowered their hand'}`, user.color);
+        return prev;
+      });
     });
 
     return () => { s.disconnect(); cleanupKeyboard(); };
   }, [playerInfo]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Broadcast media status changes
+  // Broadcast media changes
   useEffect(() => {
-    if (socket && isConnected) {
-      socket.emit('media_status_update', { micOn, cameraOn });
-    }
+    if (socket && isConnected) socket.emit('media_status_update', { micOn, cameraOn });
   }, [micOn, cameraOn, isConnected, socket]);
+
+  // Track recent proximity conversations
+  useEffect(() => {
+    if (nearbyIds.length > 0) {
+      const nearbyUsers = otherUsers.filter(u => nearbyIds.includes(u.socketId));
+      setRecentConversations(prev => {
+        const merged = [...nearbyUsers, ...prev.filter(p => !nearbyUsers.find(n => n.socketId === p.socketId))];
+        return merged.slice(0, 8);
+      });
+    }
+  }, [nearbyIds]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto open/close proximity chat
+  useEffect(() => {
+    setChatOpen(nearbyIds.length > 0);
+  }, [nearbyIds.length]);
 
   const handleZoom = (delta) =>
     setZoom(prev => parseFloat(Math.min(2.0, Math.max(0.1, prev + delta)).toFixed(2)));
@@ -150,30 +200,42 @@ export default function CosmosView({
   const chatPartner = activeParticipants[0] || null;
   const hasNearby   = nearbyIds.length > 0;
 
-  // Auto-open proximity chat on entering range, auto-close on leaving
-  useEffect(() => {
-    if (nearbyIds.length > 0) {
-      setChatOpen(true);
-    } else {
-      setChatOpen(false);
-    }
-  }, [nearbyIds.length]);
-
-  // Mutual exclusion: closing one panel doesn't open the other
-  const openGeneralChat = () => {
-    setGlobalChatOpen(true);
+  // ── Channel open/close ────────────────────────────────────────
+  const openChannel = useCallback((channelId) => {
+    setActiveChannelId(channelId);
+    setChannelOpen(true);
     setChatOpen(false);
     setMobileSidebarOpen(false);
-  };
+  }, []);
 
-  const openProximityChat = () => {
-    if (!hasNearby) return;
-    setChatOpen(prev => !prev);
-    setGlobalChatOpen(false);
+  const openGeneralChat = useCallback(() => openChannel('general'), [openChannel]);
+
+  // ── Room teleport ─────────────────────────────────────────────
+  const teleportToRoom = useCallback((roomId) => {
+    const room = ROOMS.find(r => r.id === roomId);
+    if (!room || !teleportFnRef.current) return;
+    const cx = ((room.x1 + room.x2) / 2) * TILE_SIZE;
+    const cy = ((room.y1 + room.y2) / 2) * TILE_SIZE;
+    teleportFnRef.current(cx, cy);
+    addActivity('🚀', `You teleported to ${roomId}`, playerInfo.color);
+  }, [playerInfo.color, addActivity]);
+
+  const CHANNEL_LABELS = {
+    'general':            '#general-chat',
+    'doubts-discussions': '#doubts-discussions',
+    'threads':            '#threads',
   };
 
   return (
     <div className="w-full h-screen bg-[#111120] overflow-hidden relative flex flex-col font-sans text-white">
+      <SearchModal
+        open={searchOpen}
+        onClose={() => setSearchOpen(false)}
+        otherUsers={otherUsers}
+        myUser={myUserObj}
+        onOpenChannel={openChannel}
+        onTeleportToRoom={teleportToRoom}
+      />
       <TopBar
         onlineCount={otherUsers.length + 1}
         hasNearby={hasNearby}
@@ -191,7 +253,11 @@ export default function CosmosView({
           handRaisedBy={handRaisedBy}
           mobileOpen={mobileSidebarOpen}
           onMobileClose={() => setMobileSidebarOpen(false)}
-          onOpenGeneralChat={openGeneralChat}
+          onOpenChannel={openChannel}
+          onTeleportToRoom={teleportToRoom}
+          activities={activities}
+          recentConversations={recentConversations}
+          onSearchOpen={() => setSearchOpen(true)}
         />
 
         <div className="flex-1 relative overflow-hidden">
@@ -207,42 +273,32 @@ export default function CosmosView({
               }}
               zoom={zoom}
               handRaisedBy={handRaisedBy}
+              onTeleportReady={(fn) => { teleportFnRef.current = fn; }}
             />
           )}
 
-          {/* Floating reaction emojis */}
-          {reactions.map(r => (
-            <FloatingReaction key={r.id} emoji={r.emoji} />
-          ))}
-
-          {/* Mobile D-pad touch controls */}
+          {reactions.map(r => <FloatingReaction key={r.id} emoji={r.emoji} />)}
           <MobileControls />
 
           {/* Zoom Controls */}
           <div className="absolute right-5 top-1/2 -translate-y-1/2 z-40">
             <div className="bg-white rounded-2xl shadow-xl border border-slate-100 flex flex-col items-center overflow-hidden">
-              <button onClick={() => handleZoom(0.1)}
-                className="p-3 hover:bg-slate-50 transition-colors text-slate-600 hover:text-slate-900">
+              <button onClick={() => handleZoom(0.1)} className="p-3 hover:bg-slate-50 transition-colors text-slate-600 hover:text-slate-900">
                 <Plus size={18} strokeWidth={3} />
               </button>
               <div className="w-full h-px bg-slate-100" />
-              <span className="px-3 py-1.5 text-[12px] font-black text-slate-800 tabular-nums">
-                {Math.round(zoom * 100)}%
-              </span>
+              <span className="px-3 py-1.5 text-[12px] font-black text-slate-800 tabular-nums">{Math.round(zoom * 100)}%</span>
               <div className="w-full h-px bg-slate-100" />
-              <button onClick={() => handleZoom(-0.1)}
-                className="p-3 hover:bg-slate-50 transition-colors text-slate-600 hover:text-slate-900">
+              <button onClick={() => handleZoom(-0.1)} className="p-3 hover:bg-slate-50 transition-colors text-slate-600 hover:text-slate-900">
                 <Minus size={18} strokeWidth={3} />
               </button>
               <div className="w-full h-px bg-slate-100" />
-              <button onClick={() => setZoom(0.19)} title="Full map overview (19%)"
-                className="p-3 hover:bg-slate-50 transition-colors text-slate-400 hover:text-slate-700">
+              <button onClick={() => setZoom(0.19)} title="Overview" className="p-3 hover:bg-slate-50 transition-colors text-slate-400 hover:text-slate-700">
                 <Map size={16} />
               </button>
             </div>
           </div>
 
-          {/* Floating video call UI when nearby */}
           {hasNearby && (
             <FloatingCallUI
               myUser={myUserObj}
@@ -270,34 +326,26 @@ export default function CosmosView({
           partner={chatPartner}
         />
 
-        {/* General Chat Panel — mobile backdrop */}
-        {globalChatOpen && (
-          <div
-            className="md:hidden fixed inset-0 bg-black/40 z-[400] backdrop-blur-sm"
-            onClick={() => setGlobalChatOpen(false)}
-          />
+        {/* Channel Chat Panel (general / doubts / threads) */}
+        {channelOpen && (
+          <div className="md:hidden fixed inset-0 bg-black/40 z-[400] backdrop-blur-sm" onClick={() => setChannelOpen(false)} />
         )}
-
-        {/* General Chat Panel */}
-        <div
-          className={`
-            bg-white flex flex-col z-[500] shadow-2xl overflow-hidden
-            md:relative md:h-full md:transition-all md:duration-300 md:ease-in-out md:shrink-0
-            fixed left-0 right-0 bottom-0 transition-all duration-300 ease-in-out
-            rounded-t-2xl md:rounded-none
-            ${globalChatOpen
-              ? 'md:w-[320px] md:min-w-[320px] md:border-l md:border-gray-200 top-[10%] md:top-auto'
-              : 'md:w-0 md:min-w-0 md:border-none top-full md:top-auto'
-            }
-          `}
-          style={{ borderLeft: 'none' }}
-        >
-          {globalChatOpen && (
+        <div className={`
+          bg-white flex flex-col z-[500] shadow-2xl overflow-hidden
+          md:relative md:h-full md:transition-all md:duration-300 md:ease-in-out md:shrink-0
+          fixed left-0 right-0 bottom-0 transition-all duration-300 ease-in-out rounded-t-2xl md:rounded-none
+          ${channelOpen
+            ? 'md:w-[320px] md:min-w-[320px] md:border-l md:border-gray-200 top-[10%] md:top-auto'
+            : 'md:w-0 md:min-w-0 md:border-none top-full md:top-auto'}
+        `} style={{ borderLeft: 'none' }}>
+          {channelOpen && (
             <ChatPanel
-              roomId="general"
+              key={activeChannelId}
+              roomId={activeChannelId}
               socket={socket}
               myUser={myUserObj}
-              onClose={() => setGlobalChatOpen(false)}
+              onClose={() => setChannelOpen(false)}
+              channelLabel={CHANNEL_LABELS[activeChannelId] || `#${activeChannelId}`}
             />
           )}
         </div>
@@ -307,7 +355,7 @@ export default function CosmosView({
         myUser={myUserObj}
         chatOpen={chatOpen}
         setChatOpen={setChatOpen}
-        globalChatOpen={globalChatOpen}
+        globalChatOpen={channelOpen}
         onOpenGeneralChat={openGeneralChat}
         socket={socket}
         micOn={micOn}

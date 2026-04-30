@@ -4,7 +4,18 @@ import EmojiPicker, { Theme } from 'emoji-picker-react';
 
 const API_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
 
-export default function ChatPanel({ partner, roomId, socket, myUser, onClose }) {
+const CHANNEL_COLORS = {
+  'general':            '#6366f1',
+  'doubts-discussions': '#f59e0b',
+  'threads':            '#10b981',
+};
+const CHANNEL_DESCS = {
+  'general':            'Everyone in the space',
+  'doubts-discussions': 'Ask questions, share knowledge',
+  'threads':            'Ongoing topic discussions',
+};
+
+export default function ChatPanel({ partner, roomId, socket, myUser, onClose, channelLabel }) {
   const [messages, setMessages] = useState([]);
   const [inputValue, setInputValue] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -66,19 +77,21 @@ export default function ChatPanel({ partner, roomId, socket, myUser, onClose }) 
     } catch { return ''; }
   };
 
+  const accentColor = CHANNEL_COLORS[roomId] || '#6366f1';
+  const desc = CHANNEL_DESCS[roomId] || 'Channel chat';
+  const label = channelLabel || (roomId === 'general' ? '#general-chat' : `#${roomId}`);
+
   return (
     <div className="w-full h-full flex flex-col bg-white">
       {/* Header */}
       <div className="p-4 border-b border-slate-200 flex items-center justify-between shadow-sm z-10 shrink-0">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-indigo-500 flex items-center justify-center">
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{backgroundColor: accentColor}}>
             <span className="text-white text-sm font-black">#</span>
           </div>
           <div>
-            <h2 className="font-bold text-slate-800 text-sm leading-none">
-              {roomId === 'general' ? 'General Chat' : roomId || 'Chat'}
-            </h2>
-            <p className="text-[10px] text-slate-400 font-medium mt-0.5">Everyone in the space</p>
+            <h2 className="font-bold text-slate-800 text-sm leading-none">{label}</h2>
+            <p className="text-[10px] text-slate-400 font-medium mt-0.5">{desc}</p>
           </div>
         </div>
         <button
@@ -109,13 +122,11 @@ export default function ChatPanel({ partner, roomId, socket, myUser, onClose }) 
       {/* Welcome state */}
       {messages.length === 0 && !partner && (
         <div className="flex flex-col items-center justify-center flex-1 p-8 text-center gap-3">
-          <div className="w-14 h-14 rounded-2xl bg-indigo-50 border-2 border-indigo-100 flex items-center justify-center">
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center border-2" style={{backgroundColor: accentColor + '15', borderColor: accentColor + '40'}}>
             <span className="text-2xl">#</span>
           </div>
-          <p className="text-slate-600 font-semibold text-sm">Welcome to General Chat!</p>
-          <p className="text-slate-400 text-xs leading-relaxed max-w-[200px]">
-            This is the beginning of the general channel. Say hello to everyone!
-          </p>
+          <p className="text-slate-600 font-semibold text-sm">Welcome to {label}!</p>
+          <p className="text-slate-400 text-xs leading-relaxed max-w-[200px]">{desc}. Say hello!</p>
         </div>
       )}
 
@@ -194,8 +205,8 @@ export default function ChatPanel({ partner, roomId, socket, myUser, onClose }) 
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) handleSend(e); }}
-            placeholder="Message #general"
-            className="flex-1 bg-slate-50 border border-slate-200 hover:border-slate-300 focus:bg-white focus:border-indigo-400 rounded-xl py-2.5 pl-3 pr-3 text-sm text-slate-800 focus:outline-none transition-colors"
+            placeholder={`Message ${label}`}
+            className="flex-1 bg-slate-50 border border-slate-200 hover:border-slate-300 focus:bg-white rounded-xl py-2.5 pl-3 pr-3 text-sm text-slate-800 focus:outline-none transition-colors" style={{borderColor: undefined}}
           />
           <button
             type="submit"

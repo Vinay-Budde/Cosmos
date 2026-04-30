@@ -187,7 +187,7 @@ function isWalkable(wx, wy) {
 }
 
 // ─── Component ───────────────────────────────────────────────────
-export default function CosmosCanvas({ socket, playerInfo, otherUsers, setLocalRoom, setNearbyUsers, zoom }) {
+export default function CosmosCanvas({ socket, playerInfo, otherUsers, setLocalRoom, setNearbyUsers, zoom, onTeleportReady }) {
   const canvasRef    = useRef(null);
   const meRef        = useRef({ x: 30 * TILE_SIZE, y: 30 * TILE_SIZE, lastEmit: 0, lastNearby: 0 });
   const nearbyRef    = useRef(new Set());
@@ -198,6 +198,16 @@ export default function CosmosCanvas({ socket, playerInfo, otherUsers, setLocalR
 
   useEffect(() => { zoomRef.current = zoom; }, [zoom]);
   useEffect(() => { otherUsersRef.current = otherUsers; }, [otherUsers]);
+
+  // ── Expose teleport function to parent ───────────────────────
+  useEffect(() => {
+    if (onTeleportReady) {
+      onTeleportReady((x, y) => {
+        meRef.current.x = x;
+        meRef.current.y = y;
+      });
+    }
+  }, [onTeleportReady]);
 
   // ── Build map (runs once) ─────────────────────────────────────
   const buildMap = () => {
