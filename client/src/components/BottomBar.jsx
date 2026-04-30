@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   Mic, MicOff, Video, VideoOff, MonitorUp, UserPlus,
   CircleDot, Move, Hand, ThumbsUp, Zap, MessageSquare,
@@ -14,6 +14,9 @@ export default function BottomBar({
   const [handRaised,    setHandRaised]    = useState(false);
   const [showReactions, setShowReactions] = useState(false);
   const [showMore,      setShowMore]      = useState(false);
+  const [isRecording,   setIsRecording]   = useState(false);
+  const mediaRecorderRef = useRef(null);
+  const recordedChunksRef = useRef([]);
 
   const handleHandRaise = () => {
     const next = !handRaised;
@@ -36,6 +39,58 @@ export default function BottomBar({
     } catch {
       showToast('Screen share cancelled or not supported');
     }
+  };
+
+  const handleRecord = async () => {
+    if (isRecording) {
+      mediaRecorderRef.current?.stop();
+      setIsRecording(false);
+      showToast('🔴 Recording stopped');
+    } else {
+      try {
+        const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+        const mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+        mediaRecorderRef.current = mediaRecorder;
+        recordedChunksRef.current = [];
+
+        mediaRecorder.ondataavailable = (e) => {
+          if (e.data.size > 0) {
+            recordedChunksRef.current.push(e.data);
+          }
+        };
+
+        mediaRecorder.onstop = () => {
+          const blob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.style.display = 'none';
+          a.href = url;
+          a.download = `cosmos-recording-${new Date().toISOString()}.webm`;
+          document.body.appendChild(a);
+          a.click();
+          window.URL.revokeObjectURL(url);
+        };
+
+        mediaRecorder.start();
+        setIsRecording(true);
+        showToast('🔴 Recording started');
+
+        stream.getVideoTracks()[0].onended = () => {
+          if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+            mediaRecorderRef.current.stop();
+            setIsRecording(false);
+            showToast('🔴 Recording stopped');
+          }
+        };
+      } catch (err) {
+        showToast('Recording cancelled or not supported');
+      }
+    }
+  };
+
+  const handleAction = () => {
+    socket?.emit('action', { type: 'zap', timestamp: Date.now() });
+    showToast('⚡ Action broadcasted!');
   };
 
   const handleInvite = () => {
@@ -106,7 +161,12 @@ export default function BottomBar({
         {/* Desktop: full tool row */}
         <div className="hidden sm:flex items-center gap-1">
           <IconButton icon={<UserPlus />}  label="Invite" onClick={handleInvite} />
-          <IconButton icon={<CircleDot />} label="Record" onClick={() => showToast('🔴 Recording not available in this plan')} />
+          <IconButton 
+            icon={<CircleDot className={isRecording ? 'text-rose-500 animate-pulse' : ''} />} 
+            label={isRecording ? "Stop" : "Record"} 
+            active={isRecording}
+            onClick={handleRecord} 
+          />
           <div className="w-px h-8 bg-white/10 mx-1" />
         </div>
 
@@ -154,16 +214,20 @@ export default function BottomBar({
             <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-[#1a1a2e] border border-white/10 rounded-xl shadow-2xl z-50 py-2 min-w-[170px]">
               <MobileMenuItem icon={<UserPlus className="w-4 h-4" />}   label="Invite"        onClick={() => { handleInvite(); setShowMore(false); }} />
               <MobileMenuItem icon={<MonitorUp className="w-4 h-4" />}  label="Share Screen"  onClick={() => { handleShare(); setShowMore(false); }} />
-              <MobileMenuItem icon={<CircleDot className="w-4 h-4" />}  label="Record"        onClick={() => { showToast('🔴 Not available'); setShowMore(false); }} />
+              <MobileMenuItem 
+                icon={<CircleDot className={`w-4 h-4 ${isRecording ? 'text-rose-500 animate-pulse' : ''}`} />}  
+                label={isRecording ? "Stop Recording" : "Record"}        
+                onClick={() => { handleRecord(); setShowMore(false); }} 
+              />
               <MobileMenuItem icon={<Hash className="w-4 h-4" />}       label="General Chat"  onClick={() => { onOpenGeneralChat?.(); setShowMore(false); }} />
-              <MobileMenuItem icon={<Zap className="w-4 h-4" />}        label="Action"        onClick={() => { showToast('⚡ Coming soon!'); setShowMore(false); }} />
+              <MobileMenuItem icon={<Zap className="w-4 h-4" />}        label="Action"        onClick={() => { handleAction(); setShowMore(false); }} />
             </div>
           )}
         </div>
 
         {/* Action — desktop only */}
         <div className="hidden sm:block">
-          <IconButton icon={<Zap />} label="Action" onClick={() => showToast('⚡ Action feature coming soon!')} />
+          <IconButton icon={<Zap />} label="Action" onClick={handleAction} />
         </div>
       </div>
 
