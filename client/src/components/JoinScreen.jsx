@@ -22,11 +22,27 @@ export default function JoinScreen({
     }
   };
 
+  const isInsecure = typeof window !== 'undefined' && !window.isSecureContext && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
+
   return (
     <div className="fixed inset-0 bg-white flex items-center justify-center font-sans z-[10000] overflow-y-auto">
-      <div className="w-full max-w-5xl px-5 sm:px-8 py-8 flex flex-col md:flex-row gap-8 md:gap-12 justify-between items-start md:items-center">
+      <div className="w-full max-w-5xl px-5 sm:px-8 py-8 flex flex-col gap-6 justify-center">
+        
+        {isInsecure && (
+          <div className="w-full bg-rose-50 border border-rose-200 text-rose-800 rounded-2xl p-4 flex flex-col sm:flex-row items-center gap-3.5 shadow-sm">
+            <div className="w-10 h-10 rounded-full bg-rose-500 text-white flex items-center justify-center font-black shrink-0 text-lg shadow-sm">⚠️</div>
+            <div>
+              <h4 className="font-black text-[15px] text-rose-950">Insecure Connection Detected (HTTP)</h4>
+              <p className="text-[12px] font-medium text-rose-700 leading-relaxed mt-0.5">
+                Modern browsers block WebRTC camera and microphone access on insecure connections. To enable video & audio, you must load this deployment link using <span className="font-extrabold underline text-rose-900">https://</span> instead of http://.
+              </p>
+            </div>
+          </div>
+        )}
 
-        {/* Left Column: Form & Info */}
+        <div className="flex flex-col md:flex-row gap-8 md:gap-12 justify-between items-start md:items-center w-full">
+
+          {/* Left Column: Form & Info */}
         <div className="flex-1 flex flex-col justify-center w-full md:max-w-lg">
           <h1 className="text-[24px] sm:text-[32px] font-extrabold text-[#2a2656] leading-tight mb-3">
             All space conversations in a single Place
@@ -158,6 +174,8 @@ export default function JoinScreen({
             {cameraOn ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
             {cameraOn ? 'Cam On' : 'Cam Off'}
           </button>
+        </div>
+
         </div>
 
       </div>

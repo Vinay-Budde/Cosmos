@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { MicOff, VideoOff } from 'lucide-react';
 
 export default function FloatingCallUI({
@@ -33,49 +33,54 @@ export default function FloatingCallUI({
 
 function VideoCard({ user, stream, isLocal, micOn, cameraOn, iceState, isDeafened }) {
   const videoRef = useRef(null);
-  const audioRef = useRef(null);
+  const [audioBlocked, setAudioBlocked] = useState(false);
 
-  // Attach stream to <video> and <audio> elements whenever the stream object changes.
-  // We always reassign srcObject unconditionally — the browser is smart enough to
-  // handle reassigning the same value, and this ensures newly arriving tracks
-  // (audio arriving after video, etc.) are always played.
+  // Attach stream to <video> element whenever the stream object changes.
+  // We play both audio and video directly inside the video element for remote peers.
   useEffect(() => {
     if (!stream) {
       if (videoRef.current) videoRef.current.srcObject = null;
-      if (audioRef.current) audioRef.current.srcObject = null;
       return;
     }
 
     const tracks = stream.getTracks();
     console.log(`[VideoCard] Attaching stream for ${user.username} — ${tracks.length} tracks:`, tracks.map(t => `${t.kind}(enabled=${t.enabled})`));
 
-    // Always set srcObject so new tracks are reflected
     if (videoRef.current) {
       videoRef.current.srcObject = stream;
-      videoRef.current.play().catch(err => {
-        if (err.name !== 'AbortError') {
-          console.warn(`[VideoCard] Video autoplay blocked for ${user.username}:`, err.message);
-        }
-      });
-    }
+      
+      // Local stream MUST always be muted to prevent microphone feedback loop.
+      // Remote streams are unmuted unless the local user has enabled 'Deafen'.
+      videoRef.current.muted = isLocal ? true : !!isDeafened;
 
-    if (!isLocal && audioRef.current) {
-      audioRef.current.srcObject = stream;
-      audioRef.current.muted = false; // ensure not muted (deafen is handled separately)
-      audioRef.current.play().catch(err => {
-        if (err.name !== 'AbortError') {
-          console.warn(`[VideoCard] Audio autoplay blocked for ${user.username}:`, err.message);
-        }
-      });
+      videoRef.current.play()
+        .then(() => {
+          setAudioBlocked(false);
+        })
+        .catch(err => {
+          if (err.name !== 'AbortError') {
+            console.warn(`[VideoCard] Video/Audio play blocked for ${user.username}:`, err.message);
+            // Browser autoplay policy blocked unmuted audio playback
+            if (!isLocal) {
+              setAudioBlocked(true);
+            }
+          }
+        });
     }
-  }, [stream, isLocal, user.username]);
+  }, [stream, isLocal, user.username, isDeafened]);
 
-  // Honour the deafen toggle independently — no need to re-attach the stream
-  useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.muted = !!isDeafened;
+  // Handle manual unmute/play button click (satisfies user interaction rule)
+  const handleUnmute = async () => {
+    if (videoRef.current) {
+      try {
+        videoRef.current.muted = isLocal ? true : !!isDeafened;
+        await videoRef.current.play();
+        setAudioBlocked(false);
+      } catch (err) {
+        console.error('[VideoCard] Manual play failure:', err);
+      }
     }
-  }, [isDeafened]);
+  };
 
   const initial = user.username?.charAt(0).toUpperCase() || '?';
 
@@ -92,24 +97,28 @@ function VideoCard({ user, stream, isLocal, micOn, cameraOn, iceState, isDeafene
           boxShadow: `0 0 20px ${user.color || '#6366f1'}44`,
         }}
       >
-        {/* Video layer (always rendered if stream exists, video always muted, audio is separate) */}
+        {/* Video layer (always rendered if stream exists, handles both audio and video) */}
         {stream && (
           <video
             ref={videoRef}
             autoPlay
             playsInline
-            muted={true}
+            muted={isLocal ? true : !!isDeafened}
             className={`w-full h-full object-cover transition-opacity duration-500 ${cameraOn ? 'opacity-100' : 'opacity-0 absolute inset-0'}`}
           />
         )}
-        
-        {/* Standalone Audio layer for remote streams to ensure reliable playback on mobile */}
-        {!isLocal && stream && (
-          <audio
-            ref={audioRef}
-            autoPlay
-            playsInline
-          />
+
+        {/* Autoplay blocked overlay (Premium fallback UX for mobile / strict browser policy) */}
+        {audioBlocked && !isLocal && (
+          <button
+            onClick={handleUnmute}
+            className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-slate-950/80 backdrop-blur-sm animate-pulse duration-1000 transition-all hover:bg-slate-900/90 cursor-pointer"
+          >
+            <div className="w-10 h-10 rounded-full bg-[#6366f1]/25 border border-[#6366f1]/40 flex items-center justify-center text-white shadow-lg shadow-indigo-500/20 mb-1 hover:scale-110 active:scale-95 transition-transform duration-200">
+              <span className="text-lg">🔊</span>
+            </div>
+            <span className="text-[10px] font-black tracking-tight text-indigo-200">Tap to hear</span>
+          </button>
         )}
 
         {/* Avatar layer (shown when camera is off or stream is missing) */}
