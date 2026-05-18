@@ -123,15 +123,18 @@ export function useWebRTC(socket, localStream) {
     pc.ontrack = (event) => {
       console.log(`[WebRTC] Track received from ${targetSocketId}: kind=${event.track.kind}`);
       setRemoteStreams(prev => {
-        const existing = prev[targetSocketId];
-        // Use the stream from the event if available, otherwise build one
-        const stream = event.streams[0] || existing || new MediaStream();
-        if (existing && existing !== stream) {
-          // Merge any new tracks into the existing stream reference so video elements update
-          event.streams[0]?.getTracks().forEach(t => {
-            if (!existing.getTracks().find(et => et.id === t.id)) existing.addTrack(t);
+        const stream = prev[targetSocketId] || new MediaStream();
+        // Always ensure the track itself is added to our managed MediaStream
+        if (!stream.getTracks().find(t => t.id === event.track.id)) {
+          stream.addTrack(event.track);
+        }
+        // If the browser provided a stream object, merge any other tracks it might have
+        if (event.streams && event.streams[0]) {
+          event.streams[0].getTracks().forEach(t => {
+            if (!stream.getTracks().find(et => et.id === t.id)) {
+              stream.addTrack(t);
+            }
           });
-          return { ...prev, [targetSocketId]: existing };
         }
         return { ...prev, [targetSocketId]: stream };
       });
