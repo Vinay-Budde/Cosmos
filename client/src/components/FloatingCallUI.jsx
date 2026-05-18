@@ -35,44 +35,40 @@ function VideoCard({ user, stream, isLocal, micOn, cameraOn, iceState, isDeafene
   const videoRef = useRef(null);
   const audioRef = useRef(null);
 
-  const tracks = stream ? stream.getTracks() : [];
-  const trackCount = tracks.length;
-
-  // Attach stream to <video> and <audio> elements whenever stream/tracks change
+  // Attach stream to <video> and <audio> elements whenever the stream object changes.
+  // We always reassign srcObject unconditionally — the browser is smart enough to
+  // handle reassigning the same value, and this ensures newly arriving tracks
+  // (audio arriving after video, etc.) are always played.
   useEffect(() => {
-    if (!stream) return;
-
-    if (trackCount > 0) {
-      console.log(`[VideoCard] Rendering ${user.username} with ${trackCount} tracks:`, tracks.map(t => t.kind));
+    if (!stream) {
+      if (videoRef.current) videoRef.current.srcObject = null;
+      if (audioRef.current) audioRef.current.srcObject = null;
+      return;
     }
 
-    // Attach to video element
-    if (videoRef.current && videoRef.current.srcObject !== stream) {
-      videoRef.current.srcObject = stream;
-    }
+    const tracks = stream.getTracks();
+    console.log(`[VideoCard] Attaching stream for ${user.username} — ${tracks.length} tracks:`, tracks.map(t => `${t.kind}(enabled=${t.enabled})`));
 
-    // Attach to dedicated audio element for remote streams
-    if (!isLocal && audioRef.current && audioRef.current.srcObject !== stream) {
-      audioRef.current.srcObject = stream;
-    }
-
-    // Trigger play — browsers sometimes require a manual play() after srcObject is set
+    // Always set srcObject so new tracks are reflected
     if (videoRef.current) {
+      videoRef.current.srcObject = stream;
       videoRef.current.play().catch(err => {
-        if (err.name !== 'AbortError' && trackCount > 0) {
+        if (err.name !== 'AbortError') {
           console.warn(`[VideoCard] Video autoplay blocked for ${user.username}:`, err.message);
         }
       });
     }
 
     if (!isLocal && audioRef.current) {
+      audioRef.current.srcObject = stream;
+      audioRef.current.muted = false; // ensure not muted (deafen is handled separately)
       audioRef.current.play().catch(err => {
-        if (err.name !== 'AbortError' && trackCount > 0) {
+        if (err.name !== 'AbortError') {
           console.warn(`[VideoCard] Audio autoplay blocked for ${user.username}:`, err.message);
         }
       });
     }
-  }, [stream, trackCount, user.username, isLocal]);
+  }, [stream, isLocal, user.username]);
 
   // Honour the deafen toggle independently — no need to re-attach the stream
   useEffect(() => {

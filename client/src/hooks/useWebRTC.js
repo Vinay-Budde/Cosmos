@@ -103,10 +103,11 @@ export function useWebRTC(socket, localStream) {
     // Renegotiation (fires when tracks are added/replaced after initial offer)
     pc.onnegotiationneeded = async () => {
       try {
+        if (pc.signalingState !== 'stable') return; // Skip if already negotiating
         console.log(`[WebRTC] Negotiation needed for ${targetSocketId}`);
         makingOfferRef.current[targetSocketId] = true;
         const offer = await pc.createOffer();
-        if (pc.signalingState !== 'stable') return;
+        if (pc.signalingState !== 'stable') return; // Re-check after async createOffer
         await pc.setLocalDescription(offer);
         sock.emit('webrtc_signal', {
           targetSocketId,
@@ -119,24 +120,30 @@ export function useWebRTC(socket, localStream) {
       }
     };
 
-    // Remote stream
+    // Remote stream — ALWAYS return a new MediaStream object so React
+    // detects the reference change and re-renders VideoCard, which then
+    // re-attaches srcObject to the <video> and <audio> elements.
     pc.ontrack = (event) => {
-      console.log(`[WebRTC] Track received from ${targetSocketId}: kind=${event.track.kind}`);
+      console.log(`[WebRTC] Track received from ${targetSocketId}: kind=${event.track.kind}, streams=${event.streams?.length}`);
       setRemoteStreams(prev => {
-        const stream = prev[targetSocketId] || new MediaStream();
-        // Always ensure the track itself is added to our managed MediaStream
-        if (!stream.getTracks().find(t => t.id === event.track.id)) {
-          stream.addTrack(event.track);
-        }
-        // If the browser provided a stream object, merge any other tracks it might have
+        const existing = prev[targetSocketId];
+        // Collect all tracks we already know about
+        const existingTracks = existing ? existing.getTracks() : [];
+        const trackMap = new Map(existingTracks.map(t => [t.id, t]));
+
+        // Add the new track
+        trackMap.set(event.track.id, event.track);
+
+        // Also absorb any tracks from the browser-provided stream
         if (event.streams && event.streams[0]) {
-          event.streams[0].getTracks().forEach(t => {
-            if (!stream.getTracks().find(et => et.id === t.id)) {
-              stream.addTrack(t);
-            }
-          });
+          event.streams[0].getTracks().forEach(t => trackMap.set(t.id, t));
         }
-        return { ...prev, [targetSocketId]: stream };
+
+        // Build a FRESH MediaStream from all collected tracks so React
+        // sees a new object reference and triggers a re-render.
+        const newStream = new MediaStream(Array.from(trackMap.values()));
+        console.log(`[WebRTC] Remote stream for ${targetSocketId} now has ${newStream.getTracks().length} tracks:`, newStream.getTracks().map(t => t.kind));
+        return { ...prev, [targetSocketId]: newStream };
       });
     };
 
