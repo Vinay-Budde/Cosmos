@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const User = require('../models/User');
 const Message = require('../models/Message');
 
@@ -5,24 +6,33 @@ module.exports = (io) => {
 
   // ── On server start, wipe all stale user records ──────────────
   // Any user in the DB from a previous server session is a ghost
-  User.deleteMany({}).catch(err => console.error('User table clear error:', err));
+  if (mongoose.connection.readyState === 1) {
+    User.deleteMany({}).catch(err => console.error('User table clear error:', err));
+  }
 
   io.on('connection', (socket) => {
 
     socket.on('join_cosmos', async ({ username, color, x, y, micOn, cameraOn }) => {
       console.log(`[JOIN] ${username} (${socket.id})`);
 
-      // Remove any existing record for this exact socket (duplicate join guard)
-      await User.findOneAndDelete({ socketId: socket.id });
+      let others = [];
+      try {
+        if (mongoose.connection.readyState === 1) {
+          // Remove any existing record for this exact socket (duplicate join guard)
+          await User.findOneAndDelete({ socketId: socket.id });
 
-      // Create fresh record
-      await User.create({ socketId: socket.id, username, color, x, y, micOn, cameraOn });
+          // Create fresh record
+          await User.create({ socketId: socket.id, username, color, x, y, micOn, cameraOn });
 
-      // Only return users whose socket IDs are actively connected RIGHT NOW
-      const connectedIds = Array.from(io.sockets.sockets.keys());
-      const others = await User.find({
-        socketId: { $in: connectedIds, $ne: socket.id }
-      });
+          // Only return users whose socket IDs are actively connected RIGHT NOW
+          const connectedIds = Array.from(io.sockets.sockets.keys());
+          others = await User.find({
+            socketId: { $in: connectedIds, $ne: socket.id }
+          });
+        }
+      } catch (err) {
+        console.warn(`[JOIN] DB operation failed, fallback to memory. Error: ${err.message}`);
+      }
 
       socket.emit('all_users', others);
       socket.broadcast.emit('user_joined', {
@@ -31,7 +41,13 @@ module.exports = (io) => {
     });
 
     socket.on('position_update', async ({ x, y, room }) => {
-      await User.findOneAndUpdate({ socketId: socket.id }, { x, y, room });
+      try {
+        if (mongoose.connection.readyState === 1) {
+          await User.findOneAndUpdate({ socketId: socket.id }, { x, y, room });
+        }
+      } catch (err) {
+        // Ignore buffering errors
+      }
       socket.broadcast.emit('user_moved', { socketId: socket.id, x, y, room });
     });
 
@@ -48,11 +64,14 @@ module.exports = (io) => {
 
     // ── Chat messages ─────────────────────────────────────────────
     socket.on('send_message', async ({ targetIds, message, roomId }) => {
-      const user = await User.findOne({ socketId: socket.id });
-      if (!user) {
-        // Fallback: still allow sending even without DB record
-        console.warn(`[MSG] No DB record for socket ${socket.id}, message dropped.`);
-        return;
+      let user = { username: "Unknown", color: "#ccc" }; // fallback
+      try {
+        if (mongoose.connection.readyState === 1) {
+          const dbUser = await User.findOne({ socketId: socket.id });
+          if (dbUser) user = dbUser;
+        }
+      } catch (err) {
+        console.warn(`[MSG] DB find failed for socket ${socket.id}, using fallback.`);
       }
 
       const timestamp = new Date();
@@ -68,15 +87,17 @@ module.exports = (io) => {
       if (roomId) {
         // ── General/Room chat: save to DB, broadcast to ALL ──
         try {
-          await Message.create({
-            roomId,
-            sender:   user.username,
-            senderId: socket.id,
-            message,
-            timestamp,
-          });
+          if (mongoose.connection.readyState === 1) {
+            await Message.create({
+              roomId,
+              sender:   user.username,
+              senderId: socket.id,
+              message,
+              timestamp,
+            });
+          }
         } catch (dbErr) {
-          console.error("Message save error:", dbErr);
+          console.error("Message save error:", dbErr.message);
         }
         // Broadcast to everyone in the space (including sender so their ChatPanel updates)
         io.emit('receive_message', payload);
@@ -106,9 +127,11 @@ module.exports = (io) => {
 
     socket.on('media_status_update', async ({ micOn, cameraOn }) => {
       try {
-        await User.findOneAndUpdate({ socketId: socket.id }, { micOn, cameraOn });
+        if (mongoose.connection.readyState === 1) {
+          await User.findOneAndUpdate({ socketId: socket.id }, { micOn, cameraOn });
+        }
       } catch (err) {
-        console.error("Error updating media status in DB:", err);
+        console.error("Error updating media status in DB:", err.message);
       }
       socket.broadcast.emit('media_status_update', { socketId: socket.id, micOn, cameraOn });
     });
@@ -121,10 +144,12 @@ module.exports = (io) => {
     socket.on('disconnect', async () => {
       console.log(`[LEAVE] ${socket.id}`);
       try {
-        await User.findOneAndDelete({ socketId: socket.id });
+        if (mongoose.connection.readyState === 1) {
+          await User.findOneAndDelete({ socketId: socket.id });
+        }
         socket.broadcast.emit('user_left', { socketId: socket.id });
       } catch (err) {
-        console.error('Disconnect cleanup error:', err);
+        console.error('Disconnect cleanup error:', err.message);
       }
     });
   });
